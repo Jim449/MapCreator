@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, QEvent
 from PyQt5.QtGui import QColor
 from world import World
+from plate_options import PlateOptions
 import constants
 
 # The continents still look a bit whacky,
@@ -18,17 +19,35 @@ class Main(QtWidgets.QMainWindow):
     MOUNTAIN = QColor(237, 246, 247)
     SHALLOWS = QColor(110, 154, 174)
     SHALLOWS_2 = QColor(66, 144, 174)
+    PLATE_BORDER_COLOR = QColor(60, 15, 15)
+    LINE_COLOR = QColor(15, 15, 60)
 
     def __init__(self):
         super().__init__()
 
         self.world = World(radius=6372, length=72, height=36)
+        self.show_plate_borders: bool
+        self.show_coordinate_lines: bool
 
         self.layout = QtWidgets.QHBoxLayout()
+        self.layout.setSpacing(5)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+
         self.info_layout = QtWidgets.QVBoxLayout()
+        self.info_layout.setSpacing(5)
+        self.info_layout.setContentsMargins(5, 5, 5, 5)
+
         self.map_layout = QtWidgets.QVBoxLayout()
+        self.map_layout.setSpacing(5)
+        self.map_layout.setContentsMargins(5, 5, 5, 5)
+
+        self.plate_option_layout = QtWidgets.QVBoxLayout()
+        self.plate_option_layout.setSpacing(5)
+        self.plate_option_layout.setContentsMargins(5, 5, 5, 5)
+
         self.layout.addLayout(self.info_layout)
         self.layout.addLayout(self.map_layout)
+        self.layout.addLayout(self.plate_option_layout)
 
         self.screen = QtWidgets.QLabel(parent=self)
         self.screen.installEventFilter(self)
@@ -41,6 +60,7 @@ class Main(QtWidgets.QMainWindow):
 
         self.info_label = QtWidgets.QLabel("", self)
         self.info_layout.addWidget(self.info_label)
+        self.info_layout.addStretch()
 
         self.world_create_button = QtWidgets.QPushButton(
             text="Generate world", parent=self)
@@ -79,9 +99,13 @@ class Main(QtWidgets.QMainWindow):
         self.world_info_button.clicked.connect(self.view_world_info)
         self.map_layout.addWidget(self.world_info_button)
 
+        self.plate_options = PlateOptions(self, self.plate_option_layout)
+
         widget = QtWidgets.QWidget()
         widget.setLayout(self.layout)
         self.setCentralWidget(widget)
+
+        self.view_world_info()
 
     def paint_plates(self):
         color_list = [QColor(180, 30, 30), QColor(30, 180, 30), QColor(30, 30, 180),
@@ -142,7 +166,12 @@ class Main(QtWidgets.QMainWindow):
         self.update()
 
     def create_plates(self):
-        self.world.create_plates(6, 1)
+        self.world.create_plates(
+            land_amount=self.land_plate_choice.value(),
+            sea_amount=self.sea_plate_choice.value(),
+            margin=self.plate_margin_choice.value(),
+            island_rate=self.island_rate_choice.value(),
+            growth=4)
         self.paint_plates()
 
     def expand_plates(self):
@@ -155,8 +184,53 @@ class Main(QtWidgets.QMainWindow):
         self.paint_world()
 
     def generate_world(self):
+        """Generates tectonic plates and creats continents"""
         # Does the combined work of create_plates, expand_plates and create_continents
-        self.world.create_plates(6, 1)
+        # So I can just scrap those buttons and methods
+        self.world.create_plates(
+            land_amount=self.plate_options.land_plates.value(),
+            water_amount=self.plate_options.sea_plates.value(),
+            margin=self.plate_options.plate_margin.value(),
+            island_rate=self.plate_options.island_rate.value(),
+            min_growth=self.plate_options.min_growth.value(),
+            max_growth=self.plate_options.max_growth.value())
+        # Growth should be adjustable by user
+        # I wonder how I can go about doing that without adding a growth selector for each plate
+
+        # Option 1: I establish standard growths small, medium, large = 4, 8, 12 or something like that
+        # The user decides how many plates of each size he wants
+        # So the continental plate amount button would split into three buttons for small, medium, large
+        # Same for oceanic plates. That sounds like a lot of buttons!
+
+        # Option 2: I create growth templates, like equal size, mini-plates and supercontinent
+        # This sounds like it could become fun. Option 1 doesn't allow for supercontinents!
+        # Go through the options...
+        # Equal growth: everything gets growth 4
+        # Mini-plates: About 20% gets growth 1, the rest gets growth 20
+        # Varied: About 20% gets growth 4, 60% gets growth 8, 20% gets growth 12
+        # Single-large: A single plate gets growth 8, the rest gets growth 4
+        # Supercontinent: A single plate gets growth 8, the rest gets growth 1
+        # (give the supercontinent the center type?)
+
+        # Option 3: I actually let the user build a list. I'll need a button to summon a popup-window
+        # It should hold a list of all plates growths
+        # The user can select a plate and enter a new value
+        # This would be more time-consuming to implement
+
+        # Option 4: Use randomness. The user chooses minimum and maximum growth
+        # Growth is selected uniformly from this range
+        # Additional option: let the user select random distribution
+        # An exponential random distribution should be selectable
+        # Or a normal random distribution
+        # This option sounds pretty good, I think
+        # It doesn't require too many buttons
+        # Uniform distribution may allow for mini-continents
+        # Larger continents will have growth no more than 200% of medium sized ones
+        # Normal distribution will not give much variety, I think
+        # There's built-in variety so I may want distribution to do bolder stuff
+
+        # Rather than sending a single growth value to world, I should send two lists
+        # One for continental plates and one for oceanic plates
         self.world.build_plates()
         self.world.create_continents()
         self.world.find_outlines()
@@ -186,8 +260,14 @@ Sea percentage: {sea_area / self.world.area:.0%}
             y = event.y()
             column = x // 20
             row = y // 20
+            # Have to deal with IndexError here
             plate = self.world.get_plate(column, row)
-            self.info_label.setText(f"""Region at ({column}, {row})
+            region = self.world.get_region(column, row)
+            self.info_label.setText(f"""Region
+Latitude {row*5}-{(row+1)*5},
+Longitude {column*5}-{(column+1)*5}
+Area: {region.area:,} km2
+
 Plate {plate.id}
 Type: {constants.get_type(plate.type)}
 Area: {plate.area:,} km2

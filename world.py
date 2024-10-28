@@ -64,7 +64,9 @@ class World(Area):
         subregion = region.get_subregion(x % 5, y % 5)
         return subregion
 
-    def create_plates(self, land_amount: int, water_amount: int) -> None:
+    def create_plates(self, land_amount: int, water_amount: int,
+                      margin: float, island_rate: float,
+                      min_growth: int, max_growth: int) -> None:
         """Creates the starting points of tectonic plates at random coordinates"""
         for id in range(land_amount + water_amount):
             if id >= land_amount:
@@ -77,7 +79,11 @@ class World(Area):
                 y = random.randrange(self.height)
                 if self.regions[y][x].plate == -1:
                     break
-            self.plates.append(Plate(id, self.regions, x, y, type))
+
+            growth = random.randrange(min_growth, max_growth + 1)
+
+            self.plates.append(Plate(id=id, world_map=self.regions, start_x=x, start_y=y,
+                                     type=type, margin=margin, island_rate=island_rate, growth=growth))
 
     def expand_plates(self) -> bool:
         """Expands all tectonic plates once. Level of expansion is determined by plate growth settings"""

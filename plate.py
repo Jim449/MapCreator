@@ -5,7 +5,7 @@ import constants
 
 class Plate():
     def __init__(self, id: int, world_map: list[list[Region]], start_x: int, start_y: int,
-                 type: int = constants.CENTER, margin: float = 0.2, island_rate: float = 0.1,
+                 type: int = constants.CENTER, margin: float = 0.25, island_rate: float = 0.1,
                  growth: int = 4):
         self.id: int = id
         self.world_map: list[list[Region]] = world_map
