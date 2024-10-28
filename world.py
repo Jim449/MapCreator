@@ -37,7 +37,7 @@ class World(Area):
 
         sine_diff_r = (math.sin(top_radians) -
                        math.sin(bottom_radians)) * self.radius
-        area = int(sine_diff_r * self.circumference)
+        area = int(sine_diff_r * self.circumference / self.length)
 
         top_width = int(math.cos(top_radians) * self.radius /
                         self.length * 2 * math.pi)
@@ -46,7 +46,7 @@ class World(Area):
         # Cost influences how quickly an area can expand, by setting a price for expansion to a region
         # This value should be standardized for all choices of length and area
         # I haven't done the calculations, but this seems to standardize to a maximum of 1.00
-        cost = round(area * self.length / self.circumference**2, 2)
+        cost = round(area * self.length**2 / self.circumference**2, 2)
 
         for x in range(self.length):
             circle.append(Region(x, top_y, top_width,
@@ -124,3 +124,19 @@ class World(Area):
         """Returns the plate occupying the region at (x,y)"""
         id = self.get_region(x, y).plate
         return self.plates[id]
+
+    def get_land_area(self) -> int:
+        area = 0
+        for circle in self.regions:
+            for region in circle:
+                if region.terrain in (constants.LAND, constants.MOUNTAIN):
+                    area += region.area
+        return area
+
+    def get_sea_area(self) -> int:
+        area = 0
+        for circle in self.regions:
+            for region in circle:
+                if region.terrain in (constants.WATER, constants.SHALLOWS, constants.SHALLOWS_2):
+                    area += region.area
+        return area

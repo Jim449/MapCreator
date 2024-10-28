@@ -6,7 +6,7 @@ import constants
 class Plate():
     def __init__(self, id: int, world_map: list[list[Region]], start_x: int, start_y: int,
                  type: int = constants.CENTER, margin: float = 0.2, island_rate: float = 0.1,
-                 growth: float = 4):
+                 growth: int = 4):
         self.id: int = id
         self.world_map: list[list[Region]] = world_map
         self.start_x: int = start_x
@@ -17,10 +17,12 @@ class Plate():
         self.pole_type: int = 0
         self.margin: float = margin
         self.island_rate: float = island_rate
-        self.growth: float = growth
+        self.growth: int = growth
         self.currency: float = growth
         self.alive: bool = True
         self.area: int = 0
+        self.land_area: int = 0
+        self.sea_area: int = 0
         self.claimed_regions: list[Region] = []
 
         # This keeps track of the plates boundaries
@@ -221,6 +223,7 @@ class Plate():
         if self.type == constants.LAND or self.type == constants.WATER:
             for region in self.claimed_regions:
                 region.terrain = self.type
+                self.sea_area += region.area
         else:
             self._horizontal_land_scan()
             self._vertical_land_scan()
@@ -228,11 +231,7 @@ class Plate():
             for region in self.claimed_regions:
                 if region.horizontal_land_check and region.vertical_land_check:
                     region.terrain = constants.LAND
-                elif region.horizontal_land_check:
-                    # For debugging
-                    region.terrain = constants.SHALLOWS
-                elif region.vertical_land_check:
-                    # And more debugging
-                    region.terrain = constants.SHALLOWS_2
+                    self.land_area += region.area
                 else:
                     region.terrain = constants.WATER
+                    self.sea_area += region.area

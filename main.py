@@ -42,20 +42,27 @@ class Main(QtWidgets.QMainWindow):
         self.info_label = QtWidgets.QLabel("", self)
         self.info_layout.addWidget(self.info_label)
 
-        self.plate_create_button = QtWidgets.QPushButton(
-            text="Create plates", parent=self)
-        self.plate_create_button.clicked.connect(self.create_plates)
-        self.map_layout.addWidget(self.plate_create_button)
+        self.world_create_button = QtWidgets.QPushButton(
+            text="Generate world", parent=self)
+        self.world_create_button.clicked.connect(self.generate_world)
+        self.map_layout.addWidget(self.world_create_button)
 
-        self.plate_expand_button = QtWidgets.QPushButton(
-            text="Expand plates", parent=self)
-        self.plate_expand_button.clicked.connect(self.expand_plates)
-        self.map_layout.addWidget(self.plate_expand_button)
+        # Might be fun to see plates pop up and grow but I can do it faster with generate world
 
-        self.continent_button = QtWidgets.QPushButton(
-            text="Generate continents", parent=self)
-        self.continent_button.clicked.connect(self.create_continents)
-        self.map_layout.addWidget(self.continent_button)
+        # self.plate_create_button = QtWidgets.QPushButton(
+        #     text="Create plates", parent=self)
+        # self.plate_create_button.clicked.connect(self.create_plates)
+        # self.map_layout.addWidget(self.plate_create_button)
+
+        # self.plate_expand_button = QtWidgets.QPushButton(
+        #     text="Expand plates", parent=self)
+        # self.plate_expand_button.clicked.connect(self.expand_plates)
+        # self.map_layout.addWidget(self.plate_expand_button)
+
+        # self.continent_button = QtWidgets.QPushButton(
+        #     text="Generate continents", parent=self)
+        # self.continent_button.clicked.connect(self.create_continents)
+        # self.map_layout.addWidget(self.continent_button)
 
         self.plate_view_button = QtWidgets.QPushButton(
             text="Show plates", parent=self)
@@ -66,6 +73,11 @@ class Main(QtWidgets.QMainWindow):
             text="Show continents", parent=self)
         self.continent_view_button.clicked.connect(self.view_continents)
         self.map_layout.addWidget(self.continent_view_button)
+
+        self.world_info_button = QtWidgets.QPushButton(
+            text="Show world info", parent=self)
+        self.world_info_button.clicked.connect(self.view_world_info)
+        self.map_layout.addWidget(self.world_info_button)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(self.layout)
@@ -142,11 +154,31 @@ class Main(QtWidgets.QMainWindow):
         self.world.find_outlines()
         self.paint_world()
 
+    def generate_world(self):
+        # Does the combined work of create_plates, expand_plates and create_continents
+        self.world.create_plates(6, 1)
+        self.world.build_plates()
+        self.world.create_continents()
+        self.world.find_outlines()
+        self.paint_world()
+
     def view_plates(self):
         self.paint_plates()
 
     def view_continents(self):
         self.paint_world()
+
+    def view_world_info(self):
+        sea_area = self.world.get_sea_area()
+
+        self.info_label.setText(f"""World
+Area: {self.world.area:,} km2
+Circumference: {self.world.circumference:,} km
+Radius: {self.world.radius} km
+Land: {self.world.get_land_area():,} km2
+Sea: {sea_area:,} km2
+Sea percentage: {sea_area / self.world.area:.0%}
+""")
 
     def eventFilter(self, object, event):
         if event.type() == QEvent.MouseButtonPress:
@@ -156,15 +188,19 @@ class Main(QtWidgets.QMainWindow):
             row = y // 20
             plate = self.world.get_plate(column, row)
             self.info_label.setText(f"""Region at ({column}, {row})
-
 Plate {plate.id}
-Type {plate.type}
-Area {plate.area:,}
-West end {min(plate.west_end.values())}
-East end {max(plate.east_end.values())}
-North end {min(plate.north_end.values())}
-South end {max(plate.south_end.values())}""")
-
+Type: {constants.get_type(plate.type)}
+Area: {plate.area:,} km2
+Land area: {plate.land_area:,} km2
+Sea area {plate.sea_area:,} km2
+Sea percentage: {plate.sea_area / plate.area:.0%}
+West end: {min(plate.west_end.values()) * 5}
+East end: {max(plate.east_end.values()) * 5}
+North end: {min(plate.north_end.values()) * 5}
+South end: {max(plate.south_end.values()) * 5}
+Growth: {plate.growth}
+Sea margin: {plate.margin:.0%}
+""")
         return super().eventFilter(object, event)
 
 
