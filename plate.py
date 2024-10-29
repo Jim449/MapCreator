@@ -14,15 +14,16 @@ class Plate():
         self.max_x = len(world_map[0])
         self.max_y = len(world_map)
         self.type: int = type
-        self.pole_type: int = 0
         self.margin: float = margin
         self.island_rate: float = island_rate
         self.growth: int = growth
+
         self.currency: float = growth
         self.alive: bool = True
         self.area: int = 0
         self.land_area: int = 0
         self.sea_area: int = 0
+        self.pole_type: int = 0
         self.claimed_regions: list[Region] = []
 
         # This keeps track of the plates boundaries
@@ -73,15 +74,23 @@ class Plate():
         else:
             return (x, y)
 
-    def _get_circular_coordinate(self, value, max_value) -> int:
-        if max_value == 72:
-            return (value * 5) % 360 - 180
-        elif max_value == 36:
-            return (180 + (value * -5)) % 180 - 90
-        elif max_value == 360:
-            return value % 360 - 180
-        elif max_value == 180:
-            return (180 + (value * -1)) % 180 - 90
+    def _get_circular_coordinate(self, value: int, max_value: int, horizontal: bool,
+                                 end_of_region: bool = False) -> int:
+        if value < 0:
+            value += max_value
+        elif value >= max_value:
+            value -= max_value
+
+        step = 360 // max_value
+
+        if horizontal and end_of_region:
+            return (value + 1) * step - 180
+        elif horizontal:
+            return value * step - 180
+        elif end_of_region:
+            return (0 - value - 1) * step + 90
+        else:
+            return (0 - value) * step + 90
 
     def _set_boundary(self, minimum: dict[int, int], maximum: dict[int, int],
                       key: int, value: int) -> None:
@@ -230,10 +239,14 @@ class Plate():
 
     def create_land(self):
         """Creates an ocean or continent on this plate, depending on plate type"""
-        if self.type == constants.LAND or self.type == constants.WATER:
+        if self.type == constants.LAND:
             for region in self.claimed_regions:
-                region.terrain = self.type
-                self.sea_area += region.area
+                region.terrain = constants.LAND
+                self.land_area += region.metrics.area
+        elif self.type == constants.WATER:
+            for region in self.claimed_regions:
+                region.terrain = constants.WATER
+                self.sea_area += region.metrics.area
         else:
             self._horizontal_land_scan()
             self._vertical_land_scan()
@@ -241,16 +254,21 @@ class Plate():
             for region in self.claimed_regions:
                 if region.horizontal_land_check and region.vertical_land_check:
                     region.terrain = constants.LAND
-                    self.land_area += region.area
+                    self.land_area += region.metrics.area
                 else:
                     region.terrain = constants.WATER
-                    self.sea_area += region.area
+                    self.sea_area += region.metrics.area
 
     def get_info(self) -> str:
-        west = self._get_circular_coordinate(
-            min(self.west_end.values()), self.max_x)
-        east = self._get_circular_coordinate(
-            max(self.east_end.values()), self.max_x)
+        if self.pole_type != 0:
+            west = -180
+            east = 180
+        else:
+            west = self._get_circular_coordinate(
+                min(self.west_end.values()), self.max_x)
+            east = self._get_circular_coordinate(
+                max(self.east_end.values()), self.max_x)
+
         north = self._get_circular_coordinate(
             min(self.north_end.values()), self.max_y)
         south = self._get_circular_coordinate(

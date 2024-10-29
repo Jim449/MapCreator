@@ -247,8 +247,14 @@ class Main(QtWidgets.QMainWindow):
 
         # I'm getting display errors:
         # Cannot select plate
+        # (to be expected if I use high resolution, since I only show plates on low res)
         # Plate has 0 land
         # Plate has more water area than total area
+        # I need to ensure both regions and subregions have the correct data
+        # Errors regarding plate east end?
+        # I believe I need to adjust so as not to view the west end of the eastern region
+        # Errors regarding polar plate displayed east and west?
+        # I can just hardcode -180 and 180 since I know polar plates takes up the entire space
 
         # If I use the higher resolution, program becomes LAGGY
         # Note that all regions on the same horizontal have identical lengths and areas
@@ -259,7 +265,10 @@ class Main(QtWidgets.QMainWindow):
         # It's worth a try
         # I should consider the possibility that the canvas is the villain
         # I'll be painting on it 360*180 times in a single go
-        # What if I use a picture instead? 1440x720px isn't large for a picture
+        # But that isn't too bad, is it?
+        # Can I improve this by drawing one color at a time?
+        # Do I really have to call setPen so often?
+        # But the problem isn't in the painting, right? I don't even call it that often
 
         # self.world.build_plates()
         # self.world.create_continents()

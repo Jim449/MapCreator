@@ -1,52 +1,20 @@
-from area import Area
+from region_metrics import RegionMetrics
 import constants
 
 
-class Region(Area):
+class Region():
     """Represents an area on the globe, confined by longitude and latitude lines"""
 
-    def __init__(self, x: int, y: int, side: int,
-                 top_circle_width: int, bottom_circle_width: int,
-                 circle_height: int, area: int, cost: int,
-                 max_x: int, max_y: int):
-        """Creates a region
-
-        Args:
-            x:
-                x index
-            y:
-                y index
-            side:
-                lenght/height in longitude/latitude
-            top_circle_width:
-                globe distance km from northeast to northwest end
-            bottom_circle_width:
-                globe distance km from southeast to southwest end
-            circle-height:
-                globe distance km from north to south
-            area:
-                globe area km2
-            cost:
-                value relative to area, standardized to max 1
-            max_x:
-                max x index + 1
-            max_y:
-                max y index + 1
-            """
+    def __init__(self, x: int, metrics: RegionMetrics):
         super().__init__()
 
         self.x: int = x
-        self.y: int = y
-        self.side: int = side
-        self.west = round(x / max_x * 360 - 180)
-        self.east = self.west + side
-        self.north = round(-y / max_y * 180 + 90)
-        self.south = self.north - side
-        self.top_circle_width: int = top_circle_width
-        self.bottom_circle_width: int = bottom_circle_width
-        self.circle_height: int = circle_height
-        self.area: int = area
-        self.cost: float = cost
+        self.metrics = metrics
+
+        step = 360 // metrics.length_division
+        self.west = x * step - 180
+        self.east = self.west + step
+
         self.plate: int = -1
         self.plate_x: int = 0
         self.plate_y: int = 0
@@ -57,9 +25,9 @@ class Region(Area):
         self.terrain = constants.WATER
 
     def get_info(self) -> str:
-        text = f"""Latitude: {self.north} to {self.south}
+        text = f"""Latitude: {self.metrics.south} to {self.metrics.north}
 Longitude: {self.west} to {self.east}
-Length: {self.top_circle_width:,} to {self.bottom_circle_width:,} km
-Height: {self.circle_height:,} km
-Area: {self.area:,} km2"""
+Length: {self.metrics.top_stretch:,} to {self.metrics.bottom_stretch:,} km
+Height: {self.metrics.vertical_stretch:,} km
+Area: {self.metrics.area:,} km2"""
         return text

@@ -1,7 +1,7 @@
 from area import Area
 from region import Region
-from subregion import Subregion
 from plate import Plate
+from region_metrics import RegionMetrics
 import constants
 import math
 import random
@@ -20,31 +20,28 @@ class World(Area):
         self.radius: int = radius
         self.circumference: int = int(2 * radius * math.pi)
         self.area: int = int(4 * math.pow(radius, 2) * math.pi)
-        self.length = length
-        self.height = height
         self.region_height: int = int(self.circumference / self.length)
-        self.sub_length = sub_length
-        self.sub_height = sub_height
         self.subregion_height: int = int(self.circumference / self.sub_length)
+
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
 
-        for y in range(self.height):
-            self.regions.append(self._create_regions(y, y + 1, length,
-                                                     height, self.region_height))
+        for y in range(height):
+            metrics = self._get_region_metric(
+                y, length, height, self.region_height)
+            self.regions.append(self._create_regions(length, metrics))
 
         for y in range(self.sub_height):
-            self.subregions.append(self._create_regions(y, y + 1, sub_length,
-                                                        sub_height, self.subregion_height))
+            metrics = self._get_region_metric(
+                y, sub_length, sub_height, self.region_height)
+            self.subregions.append(self._create_regions(length, metrics))
 
-    def _create_regions(self, top_y: int, bottom_y: int, length: int, height: int,
-                        height_on_sphere: int) -> list[Region]:
-        """Creates a list of regions. These span all longitude values.
-        Latitude values are decided by top_y, bottom_y, and the height setting"""
-        circle = []
-        top_radians = (height / 2 - top_y) * math.pi / height
-        bottom_radians = (height / 2 - bottom_y) * math.pi / height
+    def _get_region_metric(self, y: int, length: int, height: int,
+                           vertical_stretch: int) -> RegionMetrics:
+        """Returns shared region metrics for all regions on same latitude"""
+        top_radians = (height / 2 - y) * math.pi / height
+        bottom_radians = (height / 2 - (y + 1)) * math.pi / height
 
         sine_diff_r = (math.sin(top_radians) -
                        math.sin(bottom_radians)) * self.radius
@@ -54,16 +51,21 @@ class World(Area):
                         length * 2 * math.pi)
         bottom_width = int(math.cos(bottom_radians) *
                            self.radius / length * 2 * math.pi)
+
         # Cost influences how quickly an area can expand, by setting a price for expansion to a region
         # This value should be standardized for all choices of length and area
         # I haven't done the calculations, but this seems to standardize to a maximum of 1.00
         cost = round(area * length**2 / self.circumference**2, 2)
 
-        for x in range(length):
-            circle.append(Region(x, top_y, 360 // length,
-                                 top_width, bottom_width, height_on_sphere, area, cost,
-                                 length, height))
+        return RegionMetrics(area=area, top_stretch=top_width, bottom_stretch=bottom_width,
+                             vertical_stretch=vertical_stretch, cost=cost, y=y,
+                             length_division=length)
 
+    def _create_regions(self, length: int, metrics: RegionMetrics) -> list[Region]:
+        """Creates a list of regions on the same latitude. These span all longitude values"""
+        circle = []
+        for x in range(length):
+            circle.append(Region(x, metrics))
         return circle
 
     def get_region(self, x: int, y: int) -> Region:
@@ -142,17 +144,19 @@ class World(Area):
                 f"Attempt to access nonexistant tectonic plate in region ({x}, {y})")
 
     def get_land_area(self) -> int:
+        """Calculates total land area"""
         area = 0
         for circle in self.regions:
             for region in circle:
                 if region.terrain in (constants.LAND, constants.MOUNTAIN):
-                    area += region.area
+                    area += region.metrics.area
         return area
 
     def get_sea_area(self) -> int:
+        """Calculates total sea area"""
         area = 0
         for circle in self.regions:
             for region in circle:
                 if region.terrain in (constants.WATER, constants.SHALLOWS, constants.SHALLOWS_2):
-                    area += region.area
+                    area += region.metrics.area
         return area
