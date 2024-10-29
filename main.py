@@ -1,5 +1,5 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt, QEvent
+from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtCore import QEvent, QTimer
 from PyQt5.QtGui import QColor
 from world import World
 from plate_options import PlateOptions
@@ -21,11 +21,21 @@ class Main(QtWidgets.QMainWindow):
     SHALLOWS_2 = QColor(66, 144, 174)
     PLATE_BORDER_COLOR = QColor(60, 15, 15)
     LINE_COLOR = QColor(15, 15, 60)
+    REGION = "Region"
+    SUBREGION = "Subregion"
+
+    PLATE_COLORS = [QColor(180, 30, 30), QColor(30, 180, 30), QColor(30, 30, 180),
+                    QColor(180, 120, 30), QColor(
+                        30, 180, 120), QColor(120, 30, 180),
+                    QColor(180, 30, 120), QColor(
+                        120, 180, 30), QColor(30, 120, 180),
+                    QColor(180, 30, 180), QColor(180, 180, 30), QColor(30, 180, 180)]
 
     def __init__(self):
         super().__init__()
 
-        self.precision = "Region"
+        self.precision = Main.SUBREGION
+        self.timer = QTimer()
 
         self.world = World(radius=6372, length=72, height=36)
         self.show_plate_borders: bool
@@ -63,11 +73,6 @@ class Main(QtWidgets.QMainWindow):
         self.info_label = QtWidgets.QLabel("", self)
         self.info_layout.addWidget(self.info_label)
         self.info_layout.addStretch()
-
-        self.world_create_button = QtWidgets.QPushButton(
-            text="Generate world", parent=self)
-        self.world_create_button.clicked.connect(self.generate_world)
-        self.map_layout.addWidget(self.world_create_button)
 
         # Might be fun to see plates pop up and grow but I can do it faster with generate world
 
@@ -110,24 +115,32 @@ class Main(QtWidgets.QMainWindow):
         self.view_world_info()
 
     def paint_plates(self):
-        color_list = [QColor(180, 30, 30), QColor(30, 180, 30), QColor(30, 30, 180),
-                      QColor(180, 120, 30), QColor(
-                          30, 180, 120), QColor(120, 30, 180),
-                      QColor(180, 30, 120), QColor(120, 180, 30), QColor(30, 120, 180)]
+        """Paints tectonic plates. Unclaimed regions are painted black"""
         black = QColor(0, 0, 0)
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
-        pen.setWidth(20)
 
-        for y in range(self.world.height):
-            for x in range(self.world.length):
-                region = self.world.regions[y][x]
+        if self.precision == Main.SUBREGION:
+            map = self.world.subregions
+            length = self.world.sub_length
+            height = self.world.sub_height
+        else:
+            map = self.world.regions
+            length = self.world.length
+            height = self.world.height
+
+        point = 1440 // length
+        pen.setWidth(point)
+
+        for y in range(height):
+            for x in range(length):
+                region = map[y][x]
                 if region.plate == -1:
                     pen.setColor(black)
                 else:
-                    pen.setColor(color_list[region.plate])
+                    pen.setColor(Main.PLATE_COLORS[region.plate])
                 painter.setPen(pen)
-                painter.drawPoint(10+x*20, 10+y*20)
+                painter.drawPoint(point//2 + x*point, point//2 + y*point)
         painter.end()
         self.update()
 
@@ -159,9 +172,9 @@ class Main(QtWidgets.QMainWindow):
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
         pen.setWidth(20)
-        outliner = QtGui.QPen()
-        outliner.setWidth(1)
-        outliner.setColor(QColor(0, 0, 0))
+        # outliner = QtGui.QPen()
+        # outliner.setWidth(1)
+        # outliner.setColor(QColor(0, 0, 0))
 
         for y in range(self.world.height):
             for x in range(self.world.length):
@@ -180,87 +193,78 @@ class Main(QtWidgets.QMainWindow):
                 painter.setPen(pen)
                 painter.drawPoint(10+x*20, 10+y*20)
 
-                if region.east_outline:
-                    painter.setPen(outliner)
-                    painter.drawLine(-1+(x+1)*20, -1+y*20,
-                                     -1+(x+1)*20, -1+(y+1)*20)
-                if region.south_outline:
-                    painter.setPen(outliner)
-                    painter.drawLine(-1+x*20, -1+(y+1)*20,
-                                     -1+(x+1)*20, -1+(y+1)*20)
+                # if region.east_outline:
+                #    painter.setPen(outliner)
+                #    painter.drawLine(-1+(x+1)*20, -1+y*20,
+                #                     -1+(x+1)*20, -1+(y+1)*20)
+                # if region.south_outline:
+                #    painter.setPen(outliner)
+                #    painter.drawLine(-1+x*20, -1+(y+1)*20,
+                #                     -1+(x+1)*20, -1+(y+1)*20)
         painter.end()
         self.update()
 
-    def create_plates(self):
-        self.world.create_plates(
-            land_amount=self.land_plate_choice.value(),
-            sea_amount=self.sea_plate_choice.value(),
-            margin=self.plate_margin_choice.value(),
-            island_rate=self.island_rate_choice.value(),
-            growth=4)
-        self.paint_plates()
-
     def expand_plates(self):
-        self.world.build_plates()
-        self.paint_plates()
-
-    def create_continents(self):
-        self.world.create_continents()
-        self.world.find_outlines()
-        self.paint_world()
+        """Expands plates by one growth step and paints the progress.
+        When finished, generates continents and paints the map"""
+        if self.world.expand_plates():
+            self.world.create_continents()
+            self.paint_subregions()
+        else:
+            self.paint_plates()
+            self.timer.start(200)
 
     def generate_world(self):
         """Generates tectonic plates and creats continents"""
-        # Does the combined work of create_plates, expand_plates and create_continents
-        # So I can just scrap those buttons and methods
+
+        if self.plate_options.high_resolution.isChecked():
+            self.precision = Main.SUBREGION
+            world_map = self.world.subregions
+            min_growth = self.plate_options.min_growth.value()*25
+            max_growth = self.plate_options.max_growth.value()*25
+        else:
+            self.precision = Main.REGION
+            world_map = self.world.regions
+            min_growth = self.plate_options.min_growth.value()
+            max_growth = self.plate_options.max_growth.value()
+
         self.world.create_plates(
             land_amount=self.plate_options.land_plates.value(),
             water_amount=self.plate_options.sea_plates.value(),
             margin=self.plate_options.plate_margin.value(),
             island_rate=self.plate_options.island_rate.value(),
-            min_growth=self.plate_options.min_growth.value(),
-            max_growth=self.plate_options.max_growth.value())
-        # Growth should be adjustable by user
-        # I wonder how I can go about doing that without adding a growth selector for each plate
+            min_growth=min_growth,
+            max_growth=max_growth,
+            world_map=world_map)
+        # I'm going to generate plates on a subregion level
+        # I'd expect this to create some errors
+        # To figure out these, go back to step-by-step expansion
+        # A timer may help me here
+        self.timer.timeout.connect(self.expand_plates)
+        self.timer.start(200)
+        # Cool! But SLOW! Speed it up by forcing higher growth
+        # NICE! But increase timer some more
 
-        # Option 1: I establish standard growths small, medium, large = 4, 8, 12 or something like that
-        # The user decides how many plates of each size he wants
-        # So the continental plate amount button would split into three buttons for small, medium, large
-        # Same for oceanic plates. That sounds like a lot of buttons!
+        # I'm getting display errors:
+        # Cannot select plate
+        # Plate has 0 land
+        # Plate has more water area than total area
 
-        # Option 2: I create growth templates, like equal size, mini-plates and supercontinent
-        # This sounds like it could become fun. Option 1 doesn't allow for supercontinents!
-        # Go through the options...
-        # Equal growth: everything gets growth 4
-        # Mini-plates: About 20% gets growth 1, the rest gets growth 20
-        # Varied: About 20% gets growth 4, 60% gets growth 8, 20% gets growth 12
-        # Single-large: A single plate gets growth 8, the rest gets growth 4
-        # Supercontinent: A single plate gets growth 8, the rest gets growth 1
-        # (give the supercontinent the center type?)
+        # If I use the higher resolution, program becomes LAGGY
+        # Note that all regions on the same horizontal have identical lengths and areas
+        # Python doesn't cache large integers
+        # If I can implement a cache, it should save a good amount of memory
+        # by getting rid of 359 identical areas and more
+        # Is this a big deal? Even large integers shouldn't occupy that many memory spaces?
+        # It's worth a try
+        # I should consider the possibility that the canvas is the villain
+        # I'll be painting on it 360*180 times in a single go
+        # What if I use a picture instead? 1440x720px isn't large for a picture
 
-        # Option 3: I actually let the user build a list. I'll need a button to summon a popup-window
-        # It should hold a list of all plates growths
-        # The user can select a plate and enter a new value
-        # This would be more time-consuming to implement
-
-        # Option 4: Use randomness. The user chooses minimum and maximum growth
-        # Growth is selected uniformly from this range
-        # Additional option: let the user select random distribution
-        # An exponential random distribution should be selectable
-        # Or a normal random distribution
-        # This option sounds pretty good, I think
-        # It doesn't require too many buttons
-        # Uniform distribution may allow for mini-continents
-        # Larger continents will have growth no more than 200% of medium sized ones
-        # Normal distribution will not give much variety, I think
-        # There's built-in variety so I may want distribution to do bolder stuff
-
-        # Rather than sending a single growth value to world, I should send two lists
-        # One for continental plates and one for oceanic plates
-        self.world.build_plates()
-        self.world.create_continents()
-        self.world.find_outlines()
-        self.paint_world()
+        # self.world.build_plates()
+        # self.world.create_continents()
+        # self.paint_world()
+        # self.paint_subregions()
 
     def view_plates(self):
         self.paint_plates()
@@ -281,11 +285,12 @@ Sea percentage: {sea_area / self.world.area:.0%}
 """)
 
     def eventFilter(self, object, event):
+        """Called on map click. Displays region or subregion information"""
         if event.type() == QEvent.MouseButtonPress:
             x = event.x()
             y = event.y()
 
-            if self.precision == "Region":
+            if self.precision == Main.REGION:
                 column = x // 20
                 row = y // 20
                 region = self.world.get_region(column, row)
@@ -295,10 +300,10 @@ Sea percentage: {sea_area / self.world.area:.0%}
                         "Region\n" + region.get_info() + "\n\n" + plate.get_info())
                 except IndexError:
                     self.info_label.setText("Region\n" + region.get_info())
-            elif self.precision == "Subregion":
+            elif self.precision == Main.SUBREGION:
                 column = x // 4
                 row = x // 4
-                subregion = self.world.get_region(column, row)
+                subregion = self.world.get_subregion(column, row)
                 self.info_label.setText("Subregion\n" + subregion.get_info())
 
         return super().eventFilter(object, event)

@@ -32,7 +32,7 @@ class PlateOptions():
 
         self.land_plates = QtWidgets.QSpinBox()
         self.land_plates.setMinimum(1)
-        self.land_plates.setMaximum(15)
+        self.land_plates.setMaximum(12)
         self.land_plates.setValue(7)
         layout.addWidget(self.land_plates)
 
@@ -41,7 +41,7 @@ class PlateOptions():
 
         self.sea_plates = QtWidgets.QSpinBox()
         self.sea_plates.setMinimum(0)
-        self.sea_plates.setMaximum(10)
+        self.sea_plates.setMaximum(11)
         self.sea_plates.setValue(1)
         layout.addWidget(self.sea_plates)
 
@@ -65,6 +65,10 @@ class PlateOptions():
         self.island_rate.setSingleStep(0.01)
         self.island_rate.setValue(0.01)
         layout.addWidget(self.island_rate)
+
+        self.high_resolution = QtWidgets.QCheckBox("High resolution")
+        self.high_resolution.click()
+        layout.addWidget(self.high_resolution)
 
         self.generate_button = QtWidgets.QPushButton("Generate world")
         self.generate_button.clicked.connect(main.generate_world)

@@ -80,7 +80,7 @@ class World(Area):
 
     def create_plates(self, land_amount: int, water_amount: int,
                       margin: float, island_rate: float,
-                      min_growth: int, max_growth: int) -> None:
+                      min_growth: int, max_growth: int, world_map: list[list[Region]]) -> None:
         """Creates the starting points of tectonic plates at random coordinates"""
         for id in range(land_amount + water_amount):
             if id >= land_amount:
@@ -89,18 +89,19 @@ class World(Area):
                 type = random.randrange(9)
 
             while True:
-                x = random.randrange(self.length)
-                y = random.randrange(self.height)
-                if self.regions[y][x].plate == -1:
+                x = random.randrange(len(world_map[0]))
+                y = random.randrange(len(world_map))
+                if world_map[y][x].plate == -1:
                     break
 
             growth = random.randrange(min_growth, max_growth + 1)
 
-            self.plates.append(Plate(id=id, world_map=self.regions, start_x=x, start_y=y,
+            self.plates.append(Plate(id=id, world_map=world_map, start_x=x, start_y=y,
                                      type=type, margin=margin, island_rate=island_rate, growth=growth))
 
     def expand_plates(self) -> bool:
-        """Expands all tectonic plates once. Level of expansion is determined by plate growth settings"""
+        """Expands all tectonic plates once. Level of expansion is determined by plate growth settings.
+        Returns true when tectonic plates cover the entire world"""
         finished = True
 
         for plate in self.plates:
@@ -126,19 +127,6 @@ class World(Area):
         """Creates land and water on all plates"""
         for plate in self.plates:
             plate.create_land()
-
-    def find_outlines(self):
-        for circle in self.regions:
-            for region in circle:
-                x = region.x
-                y = region.y
-
-                if x + 1 < self.length:
-                    if region.plate != self.regions[y][x + 1].plate:
-                        region.east_outline = True
-                if y + 1 < self.height:
-                    if region.plate != self.regions[y + 1][x].plate:
-                        region.south_outline = True
 
     def get_plate(self, x: int, y: int) -> Plate:
         """Returns the plate occupying the region at (x,y)

@@ -56,11 +56,6 @@ class Region(Area):
         self.vertical_land_check = False
         self.terrain = constants.WATER
 
-        self.north_outline: bool = False
-        self.east_outline: bool = False
-        self.south_outline: bool = False
-        self.west_outline: bool = False
-
     def get_info(self) -> str:
         text = f"""Latitude: {self.north} to {self.south}
 Longitude: {self.west} to {self.east}
