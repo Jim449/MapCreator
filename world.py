@@ -20,8 +20,13 @@ class World(Area):
         self.radius: int = radius
         self.circumference: int = int(2 * radius * math.pi)
         self.area: int = int(4 * math.pow(radius, 2) * math.pi)
-        self.region_height: int = int(self.circumference / self.length)
-        self.subregion_height: int = int(self.circumference / self.sub_length)
+        self.region_height: int = int(self.circumference / length)
+        self.subregion_height: int = int(self.circumference / sub_length)
+
+        self.length = length
+        self.height = height
+        self.sub_length = sub_length
+        self.sub_height = sub_height
 
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
@@ -34,8 +39,8 @@ class World(Area):
 
         for y in range(self.sub_height):
             metrics = self._get_region_metric(
-                y, sub_length, sub_height, self.region_height)
-            self.subregions.append(self._create_regions(length, metrics))
+                y, sub_length, sub_height, self.subregion_height)
+            self.subregions.append(self._create_regions(sub_length, metrics))
 
     def _get_region_metric(self, y: int, length: int, height: int,
                            vertical_stretch: int) -> RegionMetrics:
@@ -130,12 +135,15 @@ class World(Area):
         for plate in self.plates:
             plate.create_land()
 
-    def get_plate(self, x: int, y: int) -> Plate:
+    def get_plate(self, x: int, y: int, precision: str = "Region") -> Plate:
         """Returns the plate occupying the region at (x,y)
 
         Raises:
             IndexError"""
-        id = self.get_region(x, y).plate
+        if precision == "Subregion":
+            id = self.get_subregion(x, y).plate
+        else:
+            id = self.get_region(x, y).plate
 
         try:
             return self.plates[id]

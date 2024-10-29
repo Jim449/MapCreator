@@ -1,5 +1,5 @@
 from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtCore import QEvent, QTimer
+from PyQt5.QtCore import QEvent, QTimer, Qt
 from PyQt5.QtGui import QColor
 from world import World
 from plate_options import PlateOptions
@@ -20,6 +20,7 @@ class Main(QtWidgets.QMainWindow):
     SHALLOWS = QColor(110, 154, 174)
     SHALLOWS_2 = QColor(66, 144, 174)
     PLATE_BORDER_COLOR = QColor(60, 15, 15)
+    GRID_COLOR = QColor(255, 255, 255)
     LINE_COLOR = QColor(15, 15, 60)
     REGION = "Region"
     SUBREGION = "Subregion"
@@ -116,7 +117,6 @@ class Main(QtWidgets.QMainWindow):
 
     def paint_plates(self):
         """Paints tectonic plates. Unclaimed regions are painted black"""
-        black = QColor(0, 0, 0)
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
 
@@ -136,49 +136,39 @@ class Main(QtWidgets.QMainWindow):
             for x in range(length):
                 region = map[y][x]
                 if region.plate == -1:
-                    pen.setColor(black)
+                    pen.setColor(Qt.black)
                 else:
                     pen.setColor(Main.PLATE_COLORS[region.plate])
+
                 painter.setPen(pen)
                 painter.drawPoint(point//2 + x*point, point//2 + y*point)
         painter.end()
         self.update()
 
-    def paint_subregions(self):
-        painter = QtGui.QPainter(self.screen.pixmap())
-        pen = QtGui.QPen()
-        pen.setWidth(4)
-
-        for y in range(self.world.sub_height):
-            for x in range(self.world.sub_length):
-                region = self.world.get_subregion(x, y)
-
-                if region.terrain == constants.WATER:
-                    pen.setColor(Main.OCEAN)
-                elif region.terrain == constants.LAND:
-                    pen.setColor(Main.LAND)
-                elif region.terrain == constants.MOUNTAIN:
-                    pen.setColor(Main.MOUNTAIN)
-                elif region.terrain == constants.SHALLOWS:
-                    pen.setColor(Main.SHALLOWS)
-                elif region.terrain == constants.SHALLOWS_2:
-                    pen.setColor(Main.SHALLOWS_2)
-                painter.setPen(pen)
-                painter.drawPoint(2+x*4, 2+y*4)
-        painter.end()
-        self.update()
-
     def paint_world(self):
+        """Paints regions or subregions"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
-        pen.setWidth(20)
+
+        if self.precision == Main.SUBREGION:
+            map = self.world.subregions
+            length = self.world.sub_length
+            height = self.world.sub_height
+        else:
+            map = self.world.regions
+            length = self.world.length
+            height = self.world.height
+
+        point = 1440 // length
+        pen.setWidth(point)
+
         # outliner = QtGui.QPen()
         # outliner.setWidth(1)
         # outliner.setColor(QColor(0, 0, 0))
 
-        for y in range(self.world.height):
-            for x in range(self.world.length):
-                region = self.world.get_region(x, y)
+        for y in range(height):
+            for x in range(length):
+                region = map[y][x]
 
                 if region.terrain == constants.WATER:
                     pen.setColor(Main.OCEAN)
@@ -190,8 +180,9 @@ class Main(QtWidgets.QMainWindow):
                     pen.setColor(Main.SHALLOWS)
                 elif region.terrain == constants.SHALLOWS_2:
                     pen.setColor(Main.SHALLOWS_2)
+
                 painter.setPen(pen)
-                painter.drawPoint(10+x*20, 10+y*20)
+                painter.drawPoint(point//2 + x*point, point//2 + y*point)
 
                 # if region.east_outline:
                 #    painter.setPen(outliner)
@@ -204,15 +195,32 @@ class Main(QtWidgets.QMainWindow):
         painter.end()
         self.update()
 
+    def paint_lines(self):
+        """Draws lines at -60, -30, 0, 30, 60 latitude and -90, 0, 90 longitude"""
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setColor(Main.LINE_COLOR)
+        painter.setPen(pen)
+        painter.drawLine(0, 120, 1440, 120)
+        painter.drawLine(0, 240, 1440, 240)
+        painter.drawLine(0, 360, 1440, 360)
+        painter.drawLine(0, 480, 1440, 480)
+        painter.drawLine(0, 600, 1440, 600)
+        painter.drawLine(360, 0, 360, 720)
+        painter.drawLine(720, 0, 720, 720)
+        painter.drawLine(1080, 0, 1080, 720)
+        painter.end()
+
     def expand_plates(self):
         """Expands plates by one growth step and paints the progress.
         When finished, generates continents and paints the map"""
         if self.world.expand_plates():
             self.world.create_continents()
-            self.paint_subregions()
+            self.paint_world()
+            self.paint_lines()
         else:
             self.paint_plates()
-            self.timer.start(200)
+            self.timer.singleShot(200, self.expand_plates)
 
     def generate_world(self):
         """Generates tectonic plates and creats continents"""
@@ -228,6 +236,7 @@ class Main(QtWidgets.QMainWindow):
             min_growth = self.plate_options.min_growth.value()
             max_growth = self.plate_options.max_growth.value()
 
+        # Needs to sink current plates if there are any
         self.world.create_plates(
             land_amount=self.plate_options.land_plates.value(),
             water_amount=self.plate_options.sea_plates.value(),
@@ -236,12 +245,8 @@ class Main(QtWidgets.QMainWindow):
             min_growth=min_growth,
             max_growth=max_growth,
             world_map=world_map)
-        # I'm going to generate plates on a subregion level
-        # I'd expect this to create some errors
-        # To figure out these, go back to step-by-step expansion
-        # A timer may help me here
-        self.timer.timeout.connect(self.expand_plates)
-        self.timer.start(200)
+
+        self.timer.singleShot(200, self.expand_plates)
         # Cool! But SLOW! Speed it up by forcing higher growth
         # NICE! But increase timer some more
 
@@ -277,9 +282,11 @@ class Main(QtWidgets.QMainWindow):
 
     def view_plates(self):
         self.paint_plates()
+        self.paint_lines()
 
     def view_continents(self):
         self.paint_world()
+        self.paint_lines()
 
     def view_world_info(self):
         sea_area = self.world.get_sea_area()
@@ -300,20 +307,22 @@ Sea percentage: {sea_area / self.world.area:.0%}
             y = event.y()
 
             if self.precision == Main.REGION:
+                header = "Region"
                 column = x // 20
                 row = y // 20
-                region = self.world.get_region(column, row)
-                try:
-                    plate = self.world.get_plate(column, row)
-                    self.info_label.setText(
-                        "Region\n" + region.get_info() + "\n\n" + plate.get_info())
-                except IndexError:
-                    self.info_label.setText("Region\n" + region.get_info())
-            elif self.precision == Main.SUBREGION:
+            else:
+                header = "Subregion"
                 column = x // 4
-                row = x // 4
-                subregion = self.world.get_subregion(column, row)
-                self.info_label.setText("Subregion\n" + subregion.get_info())
+                row = y // 4
+            try:
+                # No, I should get plate from subregion if I that is the precision
+                # Even if precision is changed, I still want this to work
+                region = self.world.get_subregion(column, row)
+                plate = self.world.get_plate(column, row, self.precision)
+                self.info_label.setText(
+                    f"{header}\n{region.get_info()}\n\n{plate.get_info()}")
+            except IndexError:
+                self.info_label.setText(f"{header}\n {region.get_info()}")
 
         return super().eventFilter(object, event)
 

@@ -81,15 +81,17 @@ class Plate():
         elif value >= max_value:
             value -= max_value
 
-        step = 360 // max_value
-
         if horizontal and end_of_region:
+            step = 360 // max_value
             return (value + 1) * step - 180
         elif horizontal:
+            step = 360 // max_value
             return value * step - 180
         elif end_of_region:
+            step = 180 // max_value
             return (0 - value - 1) * step + 90
         else:
+            step = 180 // max_value
             return (0 - value) * step + 90
 
     def _set_boundary(self, minimum: dict[int, int], maximum: dict[int, int],
@@ -118,8 +120,8 @@ class Plate():
         region.plate_y = y
         region.active = False
         region.alive = True
-        self.area += region.area
-        self.currency -= region.cost
+        self.area += region.metrics.area
+        self.currency -= region.metrics.cost
         self.claimed_regions.append(region)
         self._set_boundary(self.west_end, self.east_end, y, x)
         self._set_boundary(self.north_end, self.south_end, x, y)
@@ -265,14 +267,14 @@ class Plate():
             east = 180
         else:
             west = self._get_circular_coordinate(
-                min(self.west_end.values()), self.max_x)
+                min(self.west_end.values()), self.max_x, True)
             east = self._get_circular_coordinate(
-                max(self.east_end.values()), self.max_x)
+                max(self.east_end.values()), self.max_x, True, True)
 
         north = self._get_circular_coordinate(
-            min(self.north_end.values()), self.max_y)
+            min(self.north_end.values()), self.max_y, False)
         south = self._get_circular_coordinate(
-            max(self.south_end.values()), self.max_y)
+            max(self.south_end.values()), self.max_y, False, True)
 
         text = f"""Plate {self.id}
 Type: {constants.get_type(self.type)}
