@@ -73,6 +73,16 @@ class Plate():
         else:
             return (x, y)
 
+    def _get_circular_coordinate(self, value, max_value) -> int:
+        if max_value == 72:
+            return (value * 5) % 360 - 180
+        elif max_value == 36:
+            return (180 + (value * -5)) % 180 - 90
+        elif max_value == 360:
+            return value % 360 - 180
+        elif max_value == 180:
+            return (180 + (value * -1)) % 180 - 90
+
     def _set_boundary(self, minimum: dict[int, int], maximum: dict[int, int],
                       key: int, value: int) -> None:
         """Updates boundaries.
@@ -235,3 +245,25 @@ class Plate():
                 else:
                     region.terrain = constants.WATER
                     self.sea_area += region.area
+
+    def get_info(self) -> str:
+        west = self._get_circular_coordinate(
+            min(self.west_end.values()), self.max_x)
+        east = self._get_circular_coordinate(
+            max(self.east_end.values()), self.max_x)
+        north = self._get_circular_coordinate(
+            min(self.north_end.values()), self.max_y)
+        south = self._get_circular_coordinate(
+            max(self.south_end.values()), self.max_y)
+
+        text = f"""Plate {self.id}
+Type: {constants.get_type(self.type)}
+Area: {self.area:,} km2
+Land area: {self.land_area:,} km2
+Sea area {self.sea_area:,} km2
+Sea percentage: {self.sea_area / self.area:.0%}
+Longitude: {west} to {east}
+Latitude: {south} to {north}
+Growth: {self.growth}
+Sea margin: {self.margin:.0%}"""
+        return text

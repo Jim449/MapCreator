@@ -10,7 +10,8 @@ import random
 class World(Area):
     """Represents the world"""
 
-    def __init__(self, radius: int = 6372, length: int = 72, height: int = 36):
+    def __init__(self, radius: int = 6372, length: int = 72, height: int = 36,
+                 sub_length=360, sub_height=180):
         """Creates a new world, separated into regions.
         Length/height specify how many regions fit horizontally and vertically.
         Length should be twice the value of height in order to mimic longitude and latitude"""
@@ -22,35 +23,46 @@ class World(Area):
         self.length = length
         self.height = height
         self.region_height: int = int(self.circumference / self.length)
+        self.sub_length = sub_length
+        self.sub_height = sub_height
+        self.subregion_height: int = int(self.circumference / self.sub_length)
         self.regions: list[list[Region]] = []
+        self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
 
         for y in range(self.height):
-            self.regions.append(self._create_regions(y, y + 1))
+            self.regions.append(self._create_regions(y, y + 1, length,
+                                                     height, self.region_height))
 
-    def _create_regions(self, top_y: int, bottom_y: int) -> list[Region]:
+        for y in range(self.sub_height):
+            self.subregions.append(self._create_regions(y, y + 1, sub_length,
+                                                        sub_height, self.subregion_height))
+
+    def _create_regions(self, top_y: int, bottom_y: int, length: int, height: int,
+                        height_on_sphere: int) -> list[Region]:
         """Creates a list of regions. These span all longitude values.
         Latitude values are decided by top_y, bottom_y, and the height setting"""
         circle = []
-        top_radians = (self.height / 2 - top_y) * math.pi / self.height
-        bottom_radians = (self.height / 2 - bottom_y) * math.pi / self.height
+        top_radians = (height / 2 - top_y) * math.pi / height
+        bottom_radians = (height / 2 - bottom_y) * math.pi / height
 
         sine_diff_r = (math.sin(top_radians) -
                        math.sin(bottom_radians)) * self.radius
-        area = int(sine_diff_r * self.circumference / self.length)
+        area = int(sine_diff_r * self.circumference / length)
 
         top_width = int(math.cos(top_radians) * self.radius /
-                        self.length * 2 * math.pi)
+                        length * 2 * math.pi)
         bottom_width = int(math.cos(bottom_radians) *
-                           self.radius / self.length * 2 * math.pi)
+                           self.radius / length * 2 * math.pi)
         # Cost influences how quickly an area can expand, by setting a price for expansion to a region
         # This value should be standardized for all choices of length and area
         # I haven't done the calculations, but this seems to standardize to a maximum of 1.00
-        cost = round(area * self.length**2 / self.circumference**2, 2)
+        cost = round(area * length**2 / self.circumference**2, 2)
 
-        for x in range(self.length):
-            circle.append(Region(x, top_y, top_width,
-                          bottom_width, self.region_height, area, cost))
+        for x in range(length):
+            circle.append(Region(x, top_y, 360 // length,
+                                 top_width, bottom_width, height_on_sphere, area, cost,
+                                 length, height))
 
         return circle
 
@@ -58,11 +70,13 @@ class World(Area):
         """Returns the region at (x,y)"""
         return self.regions[y][x]
 
-    def get_subregion(self, x: int, y: int) -> Subregion:
+    def get_subregion(self, x: int, y: int) -> Region:
         """Returns the subregion at (x,y)"""
-        region = self.get_region(x/5, y/5)
-        subregion = region.get_subregion(x % 5, y % 5)
-        return subregion
+        return self.subregions[y][x]
+
+    def get_subregion_of_region(self, x: int, y: int, region_x: int, region_y: int) -> Region:
+        """Returns the subregion at (x, y) within region at (region_x, region_y)"""
+        return self.subregion[region_y * 5 + y][region_x * 5 + x]
 
     def create_plates(self, land_amount: int, water_amount: int,
                       margin: float, island_rate: float,
@@ -127,9 +141,17 @@ class World(Area):
                         region.south_outline = True
 
     def get_plate(self, x: int, y: int) -> Plate:
-        """Returns the plate occupying the region at (x,y)"""
+        """Returns the plate occupying the region at (x,y)
+
+        Raises:
+            IndexError"""
         id = self.get_region(x, y).plate
-        return self.plates[id]
+
+        try:
+            return self.plates[id]
+        except IndexError:
+            raise IndexError(
+                f"Attempt to access nonexistant tectonic plate in region ({x}, {y})")
 
     def get_land_area(self) -> int:
         area = 0

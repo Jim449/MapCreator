@@ -25,6 +25,8 @@ class Main(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.precision = "Region"
+
         self.world = World(radius=6372, length=72, height=36)
         self.show_plate_borders: bool
         self.show_coordinate_lines: bool
@@ -129,6 +131,30 @@ class Main(QtWidgets.QMainWindow):
         painter.end()
         self.update()
 
+    def paint_subregions(self):
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setWidth(4)
+
+        for y in range(self.world.sub_height):
+            for x in range(self.world.sub_length):
+                region = self.world.get_subregion(x, y)
+
+                if region.terrain == constants.WATER:
+                    pen.setColor(Main.OCEAN)
+                elif region.terrain == constants.LAND:
+                    pen.setColor(Main.LAND)
+                elif region.terrain == constants.MOUNTAIN:
+                    pen.setColor(Main.MOUNTAIN)
+                elif region.terrain == constants.SHALLOWS:
+                    pen.setColor(Main.SHALLOWS)
+                elif region.terrain == constants.SHALLOWS_2:
+                    pen.setColor(Main.SHALLOWS_2)
+                painter.setPen(pen)
+                painter.drawPoint(2+x*4, 2+y*4)
+        painter.end()
+        self.update()
+
     def paint_world(self):
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
@@ -139,7 +165,7 @@ class Main(QtWidgets.QMainWindow):
 
         for y in range(self.world.height):
             for x in range(self.world.length):
-                region = self.world.regions[y][x]
+                region = self.world.get_region(x, y)
 
                 if region.terrain == constants.WATER:
                     pen.setColor(Main.OCEAN)
@@ -258,29 +284,23 @@ Sea percentage: {sea_area / self.world.area:.0%}
         if event.type() == QEvent.MouseButtonPress:
             x = event.x()
             y = event.y()
-            column = x // 20
-            row = y // 20
-            # Have to deal with IndexError here
-            plate = self.world.get_plate(column, row)
-            region = self.world.get_region(column, row)
-            self.info_label.setText(f"""Region
-Latitude {row*5}-{(row+1)*5},
-Longitude {column*5}-{(column+1)*5}
-Area: {region.area:,} km2
 
-Plate {plate.id}
-Type: {constants.get_type(plate.type)}
-Area: {plate.area:,} km2
-Land area: {plate.land_area:,} km2
-Sea area {plate.sea_area:,} km2
-Sea percentage: {plate.sea_area / plate.area:.0%}
-West end: {min(plate.west_end.values()) * 5}
-East end: {max(plate.east_end.values()) * 5}
-North end: {min(plate.north_end.values()) * 5}
-South end: {max(plate.south_end.values()) * 5}
-Growth: {plate.growth}
-Sea margin: {plate.margin:.0%}
-""")
+            if self.precision == "Region":
+                column = x // 20
+                row = y // 20
+                region = self.world.get_region(column, row)
+                try:
+                    plate = self.world.get_plate(column, row)
+                    self.info_label.setText(
+                        "Region\n" + region.get_info() + "\n\n" + plate.get_info())
+                except IndexError:
+                    self.info_label.setText("Region\n" + region.get_info())
+            elif self.precision == "Subregion":
+                column = x // 4
+                row = x // 4
+                subregion = self.world.get_region(column, row)
+                self.info_label.setText("Subregion\n" + subregion.get_info())
+
         return super().eventFilter(object, event)
 
 
@@ -289,17 +309,3 @@ if __name__ == "__main__":
     window = Main()
     window.show()
     app.exec_()
-
-    # This all works fine...
-    # map_creator: MapCreator = MapCreator(radius=6372, length=72, height=36)
-
-    # world = map_creator.world
-    # print(f"World, radius {world.radius:,}, circumference {
-    #       world.circumference:,}, area {world.area:,}\n")
-
-    # for circle in world.regions:
-    #     region = circle[0]
-
-    #     print(f"Region at {region.y}-{region.y+1}, widths {region.top_circle_width}-{
-    #           region.bottom_circle_width}, height {region.circle_height}, area {
-    #               region.area:,}, cost {region.cost}")

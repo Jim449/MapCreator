@@ -33,7 +33,7 @@ class PlateOptions():
         self.land_plates = QtWidgets.QSpinBox()
         self.land_plates.setMinimum(1)
         self.land_plates.setMaximum(15)
-        self.land_plates.setValue(6)
+        self.land_plates.setValue(7)
         layout.addWidget(self.land_plates)
 
         self.sea_plate_label = QtWidgets.QLabel("Amount of oceanic plates")
