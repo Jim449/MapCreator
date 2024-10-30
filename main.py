@@ -3,20 +3,11 @@ from PyQt5.QtCore import QEvent, QTimer, Qt
 from PyQt5.QtGui import QColor
 from world import World
 from plate_options import PlateOptions
+from region import Region
 import constants
 
 
 class Main(QtWidgets.QMainWindow):
-    OCEAN = QColor(22, 134, 174)
-    LAND = QColor(189, 171, 123)
-    MOUNTAIN = QColor(237, 246, 247)
-    SHALLOWS = QColor(110, 154, 174)
-    SHALLOWS_2 = QColor(66, 144, 174)
-    PLATE_BORDER_COLOR = QColor(60, 15, 15)
-    GRID_COLOR = QColor(150, 150, 180)
-    LINE_COLOR = QColor(15, 15, 60)
-    REGION = "Region"
-    SUBREGION = "Subregion"
 
     PLATE_COLORS = [QColor(180, 30, 30), QColor(30, 180, 30), QColor(30, 30, 180),
                     QColor(180, 120, 30), QColor(
@@ -28,7 +19,7 @@ class Main(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.precision = Main.SUBREGION
+        self.precision = constants.SUBREGION
         self.timer = QTimer()
 
         self.world = World(radius=6372, length=72, height=36)
@@ -71,7 +62,7 @@ class Main(QtWidgets.QMainWindow):
         # I can fit 14x7 regions
 
         self.world_map = QtGui.QPixmap(1440, 720)
-        self.world_map.fill(Main.OCEAN)
+        self.world_map.fill(constants.get_color(constants.WATER))
         self.screen.setPixmap(self.world_map)
         self.map_layout.addWidget(self.screen)
 
@@ -108,7 +99,7 @@ class Main(QtWidgets.QMainWindow):
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
 
-        if self.precision == Main.SUBREGION:
+        if self.precision == constants.SUBREGION:
             map = self.world.subregions
             length = self.world.sub_length
             height = self.world.sub_height
@@ -133,12 +124,22 @@ class Main(QtWidgets.QMainWindow):
         painter.end()
         self.update()
 
+    def has_plate_border(self, map: list[Region], region: Region, x: int, y: int,
+                         dir: int) -> bool:
+        """Returns true if the region has a plate border with an adjacent region"""
+        nx, ny = constants.get_next_coordinates(x, y, dir)
+
+        try:
+            return region.plate != map[ny][nx].plate
+        except IndexError:
+            return False
+
     def paint_world(self):
         """Paints regions or subregions"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
 
-        if self.precision == Main.SUBREGION:
+        if self.precision == constants.SUBREGION:
             map = self.world.subregions
             length = self.world.sub_length
             height = self.world.sub_height
@@ -150,36 +151,26 @@ class Main(QtWidgets.QMainWindow):
         point = 1440 // length
         pen.setWidth(point)
 
-        # outliner = QtGui.QPen()
-        # outliner.setWidth(1)
-        # outliner.setColor(QColor(0, 0, 0))
+        outliner = QtGui.QPen()
+        outliner.setWidth(1)
+        outliner.setColor(constants.PLATE_BORDER_COLOR)
 
         for y in range(height):
             for x in range(length):
                 region = map[y][x]
-
-                if region.terrain == constants.WATER:
-                    pen.setColor(Main.OCEAN)
-                elif region.terrain == constants.LAND:
-                    pen.setColor(Main.LAND)
-                elif region.terrain == constants.MOUNTAIN:
-                    pen.setColor(Main.MOUNTAIN)
-                elif region.terrain == constants.SHALLOWS:
-                    pen.setColor(Main.SHALLOWS)
-                elif region.terrain == constants.SHALLOWS_2:
-                    pen.setColor(Main.SHALLOWS_2)
-
+                pen.setColor(constants.get_color(region.terrain))
                 painter.setPen(pen)
                 painter.drawPoint(point//2 + x*point, point//2 + y*point)
 
-                # if region.east_outline:
-                #    painter.setPen(outliner)
-                #    painter.drawLine(-1+(x+1)*20, -1+y*20,
-                #                     -1+(x+1)*20, -1+(y+1)*20)
-                # if region.south_outline:
-                #    painter.setPen(outliner)
-                #    painter.drawLine(-1+x*20, -1+(y+1)*20,
-                #                     -1+(x+1)*20, -1+(y+1)*20)
+                if self.has_plate_border(map, region, x, y, constants.EAST):
+                    painter.setPen(outliner)
+                    painter.drawLine((x+1)*point - 1, y*point - 1,
+                                     (x+1)*point - 1, (y+1)*point - 1)
+
+                if self.has_plate_border(map, region, x, y, constants.SOUTH):
+                    painter.setPen(outliner)
+                    painter.drawLine(x*point - 1, (y+1)*point - 1,
+                                     (x+1)*point - 1, (y+1)*point - 1)
         painter.end()
         self.update()
 
@@ -187,7 +178,7 @@ class Main(QtWidgets.QMainWindow):
         """Draws lines at -60, -30, 0, 30, 60 latitude and -90, 0, 90 longitude"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
-        pen.setColor(Main.LINE_COLOR)
+        pen.setColor(constants.LINE_COLOR)
         painter.setPen(pen)
         painter.drawLine(0, 120, 1440, 120)
         painter.drawLine(0, 240, 1440, 240)
@@ -204,7 +195,7 @@ class Main(QtWidgets.QMainWindow):
         """Draws region grid"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
-        pen.setColor(Main.GRID_COLOR)
+        pen.setColor(constants.GRID_COLOR)
         painter.setPen(pen)
 
         for x in range(0, 1440, 20):
@@ -230,7 +221,7 @@ class Main(QtWidgets.QMainWindow):
         """Generates tectonic plates and creats continents"""
 
         if self.plate_options.high_resolution.isChecked():
-            self.precision = Main.SUBREGION
+            self.precision = constants.SUBREGION
             world_map = self.world.subregions
             min_growth = self.plate_options.min_growth.value()*4
             max_growth = self.plate_options.max_growth.value()*4
@@ -288,7 +279,7 @@ Sea percentage: {sea_area / self.world.area:.0%}
             x = event.x()
             y = event.y()
 
-            if self.precision == Main.REGION:
+            if self.precision == constants.REGION:
                 header = "Region"
                 column = x // 20
                 row = y // 20

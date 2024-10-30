@@ -40,6 +40,9 @@ class Plate():
         self.north_end: dict[int, int] = {start_x: start_y}
         self.south_end: dict[int, int] = {start_x: start_y}
 
+        self.horizontal_distance: dict[int, int] = {}
+        self.vertical_distance: dict[int, int] = {}
+
         if start_y == 0 or start_y == self.max_y - 1:
             self.claim_pole(start_y)
         else:
@@ -113,6 +116,19 @@ class Plate():
             minimum[key] = value
             maximum[key] = value
 
+    def _add_distance(self, x: int, y: int) -> None:
+        """Increases appropriate horizontal and vertical distances by 1,
+        based on claiming the region at (x, y)"""
+        if y in self.horizontal_distance:
+            self.horizontal_distance[y] += 1
+        else:
+            self.horizontal_distance[y] = 1
+
+        if x in self.vertical_distance:
+            self.vertical_distance[x] += 1
+        else:
+            self.vertical_distance[x] = 1
+
     def claim_region(self, x: int, y: int) -> None:
         """Claims a region. Updates plate boundaries and pays region cost"""
         ix, iy = self._get_coordinates(x, y)
@@ -124,8 +140,9 @@ class Plate():
         self.area += region.metrics.area
         self.currency -= region.metrics.cost
         self.queued_regions.append(region)
-        self._set_boundary(self.west_end, self.east_end, y, x)
-        self._set_boundary(self.north_end, self.south_end, x, y)
+        self._set_boundary(self.west_end, self.east_end, iy, x)
+        self._set_boundary(self.north_end, self.south_end, ix, y)
+        self._add_distance(ix, iy)
 
     def claim_pole(self, y: int) -> None:
         """Claims an entire horizontal circle at a pole.
@@ -202,14 +219,30 @@ class Plate():
             south_margin = 0
 
         for column in self.north_end.keys():
-            length = self.south_end[column] - self.north_end[column]
-            start = self.north_end[column] + int(length * north_margin)
-            end = self.south_end[column] - int(length * south_margin)
+            # Change from using north_end and south_end to using distances
+            # length = self.south_end[column] - self.north_end[column]
+            length = self.vertical_distance[column]
+            # start = self.north_end[column] + int(length * north_margin)
+            start = self.north_end[column]
+            # end = self.south_end[column] - int(length * south_margin)
+            end = self.south_end[column]
+
+            # Skip the first regions, then include some, then skip again
+            first_skip = length * north_margin
+            # Will only be used to calculate include, so I won't need a variable?
+            second_skip = length * south_margin
+            include = length - first_skip - second_skip
 
             for row in range(start, end + 1):
                 x, y = self._get_coordinates(column, row)
                 if self.world_map[y][x].plate == self.id:
-                    self.world_map[y][x].horizontal_land_check = True
+                    if first_skip > 0:
+                        first_skip -= 1
+                    elif include > 0:
+                        self.world_map[y][x].horizontal_land_check = True
+                        include -= 1
+                    else:
+                        break
 
     def _vertical_land_scan(self):
         """Scans plate vertically, finding valid land positions on each horizontal"""
@@ -229,16 +262,30 @@ class Plate():
             east_margin = 0
 
         for row in self.west_end.keys():
-            length = self.east_end[row] - self.west_end[row]
-            start = self.west_end[row] + int(length * west_margin)
-            end = self.east_end[row] - int(length * east_margin)
+            length = self.horizontal_distance[row]
+            # length = self.east_end[row] - self.west_end[row]
+            start = self.west_end[row]
+            # start = self.west_end[row] + int(length * west_margin)
+            end = self.east_end[row]
+            # end = self.east_end[row] - int(length * east_margin)
+
+            first_skip = length * west_margin
+            # Omit variable?
+            second_skip = length * east_margin
+            include = length - first_skip - second_skip
 
             for column in range(start, end + 1):
                 x, y = self._get_coordinates(column, row)
                 if self.world_map[y][x].plate == self.id:
-                    self.world_map[y][x].vertical_land_check = True
+                    if first_skip > 0:
+                        first_skip -= 1
+                    elif include > 0:
+                        self.world_map[y][x].vertical_land_check = True
+                        include -= 1
+                    else:
+                        break
 
-    def pole_border_correction(self):
+    def _pole_border_correction(self):
         """Disables globe circling in west end and east end coordinates.
         In function, this should solve continent placement bugs
         which resulted in unexpected water in the far east or west"""
@@ -251,15 +298,93 @@ class Plate():
                     self.west_end[y] = x
                     break
 
-            for x in range(-1, self.max_x - 1, -1):
+            for x in range(self.max_x - 1, -1, -1):
                 if self.world_map[y][x].plate == self.id:
                     self.east_end[y] = x
                     break
 
     def create_land(self):
         """Creates an ocean or continent on this plate, depending on plate type"""
+        # This algorithm does have some weaknesses
+        # First, the pole problem isn't entirely solved,
+        # since the continents on the east and west sides can be mismatched
+        # I've fixed a detail in pole correction, maybe it does the trick
+        # NOPE!
+        # I can't make sense of it
+        # I have used the pole correction to repair start and endpoints?
+        # I have used conditional in vertical scan to set all margins to 0
+        # The horizontal scan can't simply skip over areas
+        # I just have to print stuff like a madman.
+        # Does the pole correction run? Does the margins run? Does the scan go over the entire length?
+        # Perhaps the error is that I've used circling coordinates as keys?
+        # I do need them as values, but they don't offer any advantages as keys?
+        # Changed!
+        # This might've worked. Try some more and see if everything looks good
+
+        # Secondly, there's the problem of water pockets
+        # in places where land is to be expected
+        # It's clear the places are too far off in some direction to pass both scans
+        # but it should be possible to make an exception
+
+        # Third, there's the case where a plate has a 'banana form'
+        # The middle of an area belongs to a different plate
+        # However, this middle area is counted as if it does belong to the plate
+        # This gives massive increase in continent length at some coordinate,
+        # making the side of the continent into a perfectly smooth line
+
+        # To solve the third problem, I could find the distance of the plate,
+        # not counting places where the plate is interrupted by other plates
+        # Use the scans, ignoring distance times margin regions owned by self
+        # DONE!
+        # Hopefully, this will look better
+
+        # To solve the second problem, I could use a 'fill-tool'
+        # It will search an area with water until the entire area has been found
+        # Then, it will fill that area if it is sufficiently small
+        # I will need to search along the entire border
+        # There are some tricks I can use
+        # First, stop searching once the search area becomes sufficiently large
+        # Second, if I have an unbroken sequence of water cells,
+        # I don't have to start another search since the result will be the same
+        # If I do find an area to fill, I should just fill it right away
+
+        # This 'fill' solution probably won't be any good
+        # The spaces I want to fill aren't surrounded by land and borders
+        # And they're large! I need something else!
+
+        # Fourth problem!
+        # The boring rhombe expansion shape
+        # This should be solvable by limiting expansion based on area size
+        # Let's say max expansion = 50% of total size
+        # It won't have any effect during late expansion
+        # Let's write down surface cells, total size, expansion if limit is 50%
+        # 1 - 1 - 0.5
+        # 4 - 5 - 2.5       4   2   1
+        # 8 - 13 - 6.5      12  6   3
+        # 12 - 25 - 12.5    24  12  6
+        # 16 - 41 - 20.5    40  20  10
+        # 20 - 61 - 30.5    60  30  15
+        # 24 - 85 - 42.5    84  42  21
+        # 28 - 113 - 56.5   112 56  28
+        # 32 - 145 - 72.5   144 72  36
+        # 36 - 181 - 90.5   180 90  45
+        # 40 - 221 - 110.5  220 110 55
+        # So it won't take long until the limitation is void
+        # A possible expansion rate would be 32
+        # It is not reached until size 145
+        # In order to prohibit full growth, I could use limit 25%
+        # From 145, I get allowed growth 36
+        # I'm going to simplify the numbers a bit by subtracting with 1
+        # I can see a pattern going on. x1+1, x1.5+1, x2+1...
+        # Oh! Didn't expect to see that pattern here. 1, 1+2, 1+2+3...
+        # Or should I limit growth based on growth options available?
+        # Allow something like 75% of available options
+        # That should cut down on some finishing sprints
+        # Which is a good thing
+        # Might make it easier for superplates to eat poor li'l plates whole, though
+
         if self.pole_type != 0:
-            self.pole_border_correction()
+            self._pole_border_correction()
 
         if self.type == constants.LAND:
             for region in self.claimed_regions:
