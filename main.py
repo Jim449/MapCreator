@@ -5,13 +5,6 @@ from world import World
 from plate_options import PlateOptions
 import constants
 
-# The continents still look a bit whacky,
-# especially the ones crossing the east-west-barrier
-# I may want to do some error searching
-# Right! I still get the wrong coordinate from region in plate.expand
-# Looking better
-# Now, try showing some plate info when clicking on map
-
 
 class Main(QtWidgets.QMainWindow):
     OCEAN = QColor(22, 134, 174)
@@ -20,7 +13,7 @@ class Main(QtWidgets.QMainWindow):
     SHALLOWS = QColor(110, 154, 174)
     SHALLOWS_2 = QColor(66, 144, 174)
     PLATE_BORDER_COLOR = QColor(60, 15, 15)
-    GRID_COLOR = QColor(255, 255, 255)
+    GRID_COLOR = QColor(150, 150, 180)
     LINE_COLOR = QColor(15, 15, 60)
     REGION = "Region"
     SUBREGION = "Subregion"
@@ -66,6 +59,17 @@ class Main(QtWidgets.QMainWindow):
         self.screen.installEventFilter(self)
         # World map has 72x36 regions and 360x180 subregions
         # Multiply the latter by 4 to get a decent display size
+
+        # I should have a zoomed in map as well
+        # Maximum region size is 556x556 km
+        # I can afford 1px per km
+        # That should suffice
+
+        # Use a medium zoom map too
+        # I may want to display subregions at 20x20px
+        # Then a region will be 100x100px
+        # I can fit 14x7 regions
+
         self.world_map = QtGui.QPixmap(1440, 720)
         self.world_map.fill(Main.OCEAN)
         self.screen.setPixmap(self.world_map)
@@ -74,23 +78,6 @@ class Main(QtWidgets.QMainWindow):
         self.info_label = QtWidgets.QLabel("", self)
         self.info_layout.addWidget(self.info_label)
         self.info_layout.addStretch()
-
-        # Might be fun to see plates pop up and grow but I can do it faster with generate world
-
-        # self.plate_create_button = QtWidgets.QPushButton(
-        #     text="Create plates", parent=self)
-        # self.plate_create_button.clicked.connect(self.create_plates)
-        # self.map_layout.addWidget(self.plate_create_button)
-
-        # self.plate_expand_button = QtWidgets.QPushButton(
-        #     text="Expand plates", parent=self)
-        # self.plate_expand_button.clicked.connect(self.expand_plates)
-        # self.map_layout.addWidget(self.plate_expand_button)
-
-        # self.continent_button = QtWidgets.QPushButton(
-        #     text="Generate continents", parent=self)
-        # self.continent_button.clicked.connect(self.create_continents)
-        # self.map_layout.addWidget(self.continent_button)
 
         self.plate_view_button = QtWidgets.QPushButton(
             text="Show plates", parent=self)
@@ -106,6 +93,7 @@ class Main(QtWidgets.QMainWindow):
             text="Show world info", parent=self)
         self.world_info_button.clicked.connect(self.view_world_info)
         self.map_layout.addWidget(self.world_info_button)
+        self.map_layout.addStretch()
 
         self.plate_options = PlateOptions(self, self.plate_option_layout)
 
@@ -210,6 +198,21 @@ class Main(QtWidgets.QMainWindow):
         painter.drawLine(720, 0, 720, 720)
         painter.drawLine(1080, 0, 1080, 720)
         painter.end()
+        self.update()
+
+    def paint_grid(self):
+        """Draws region grid"""
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setColor(Main.GRID_COLOR)
+        painter.setPen(pen)
+
+        for x in range(0, 1440, 20):
+            for y in range(0, 720, 20):
+                painter.drawLine(x, 0, x, 720)
+                painter.drawLine(0, y, 1440, y)
+        painter.end()
+        self.update()
 
     def expand_plates(self):
         """Expands plates by one growth step and paints the progress.
@@ -217,6 +220,7 @@ class Main(QtWidgets.QMainWindow):
         if self.world.expand_plates():
             self.world.create_continents()
             self.paint_world()
+            self.paint_grid()
             self.paint_lines()
         else:
             self.paint_plates()
@@ -228,13 +232,20 @@ class Main(QtWidgets.QMainWindow):
         if self.plate_options.high_resolution.isChecked():
             self.precision = Main.SUBREGION
             world_map = self.world.subregions
-            min_growth = self.plate_options.min_growth.value()*25
-            max_growth = self.plate_options.max_growth.value()*25
+            min_growth = self.plate_options.min_growth.value()*4
+            max_growth = self.plate_options.max_growth.value()*4
+            super_growth = 32
         else:
             self.precision = Main.REGION
             world_map = self.world.regions
             min_growth = self.plate_options.min_growth.value()
             max_growth = self.plate_options.max_growth.value()
+            super_growth = 8
+
+        if self.plate_options.supercontinent_toggle.isChecked():
+            supercontinents = 1
+        else:
+            supercontinents = 0
 
         # Needs to sink current plates if there are any
         self.world.create_plates(
@@ -244,41 +255,11 @@ class Main(QtWidgets.QMainWindow):
             island_rate=self.plate_options.island_rate.value(),
             min_growth=min_growth,
             max_growth=max_growth,
+            odd_amount=supercontinents,
+            odd_growth=super_growth,
             world_map=world_map)
 
         self.timer.singleShot(200, self.expand_plates)
-        # Cool! But SLOW! Speed it up by forcing higher growth
-        # NICE! But increase timer some more
-
-        # I'm getting display errors:
-        # Cannot select plate
-        # (to be expected if I use high resolution, since I only show plates on low res)
-        # Plate has 0 land
-        # Plate has more water area than total area
-        # I need to ensure both regions and subregions have the correct data
-        # Errors regarding plate east end?
-        # I believe I need to adjust so as not to view the west end of the eastern region
-        # Errors regarding polar plate displayed east and west?
-        # I can just hardcode -180 and 180 since I know polar plates takes up the entire space
-
-        # If I use the higher resolution, program becomes LAGGY
-        # Note that all regions on the same horizontal have identical lengths and areas
-        # Python doesn't cache large integers
-        # If I can implement a cache, it should save a good amount of memory
-        # by getting rid of 359 identical areas and more
-        # Is this a big deal? Even large integers shouldn't occupy that many memory spaces?
-        # It's worth a try
-        # I should consider the possibility that the canvas is the villain
-        # I'll be painting on it 360*180 times in a single go
-        # But that isn't too bad, is it?
-        # Can I improve this by drawing one color at a time?
-        # Do I really have to call setPen so often?
-        # But the problem isn't in the painting, right? I don't even call it that often
-
-        # self.world.build_plates()
-        # self.world.create_continents()
-        # self.paint_world()
-        # self.paint_subregions()
 
     def view_plates(self):
         self.paint_plates()
@@ -286,6 +267,7 @@ class Main(QtWidgets.QMainWindow):
 
     def view_continents(self):
         self.paint_world()
+        self.paint_grid()
         self.paint_lines()
 
     def view_world_info(self):
@@ -310,19 +292,20 @@ Sea percentage: {sea_area / self.world.area:.0%}
                 header = "Region"
                 column = x // 20
                 row = y // 20
+                region = self.world.get_region(column, row)
             else:
                 header = "Subregion"
                 column = x // 4
                 row = y // 4
+                region = self.world.get_subregion(column, row)
             try:
                 # No, I should get plate from subregion if I that is the precision
                 # Even if precision is changed, I still want this to work
-                region = self.world.get_subregion(column, row)
                 plate = self.world.get_plate(column, row, self.precision)
                 self.info_label.setText(
                     f"{header}\n{region.get_info()}\n\n{plate.get_info()}")
             except IndexError:
-                self.info_label.setText(f"{header}\n {region.get_info()}")
+                self.info_label.setText(f"{header}\n{region.get_info()}")
 
         return super().eventFilter(object, event)
 

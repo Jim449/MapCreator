@@ -13,7 +13,7 @@ class PlateOptions():
 
         self.min_growth = QtWidgets.QSpinBox()
         self.min_growth.setMinimum(1)
-        self.min_growth.setMaximum(20)
+        self.min_growth.setMaximum(8)
         self.min_growth.setValue(4)
         layout.addWidget(self.min_growth)
 
@@ -22,7 +22,7 @@ class PlateOptions():
 
         self.max_growth = QtWidgets.QSpinBox()
         self.max_growth.setMinimum(1)
-        self.max_growth.setMaximum(20)
+        self.max_growth.setMaximum(8)
         self.max_growth.setValue(4)
         layout.addWidget(self.max_growth)
 
@@ -44,6 +44,9 @@ class PlateOptions():
         self.sea_plates.setMaximum(11)
         self.sea_plates.setValue(1)
         layout.addWidget(self.sea_plates)
+
+        self.supercontinent_toggle = QtWidgets.QCheckBox("Add supercontinent")
+        layout.addWidget(self.supercontinent_toggle)
 
         self.plate_margin_label = QtWidgets.QLabel(
             "Sea margin of continental plates")

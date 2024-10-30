@@ -19,7 +19,6 @@ class Region():
         self.plate_x: int = 0
         self.plate_y: int = 0
         self.active: bool = True
-        self.alive: bool = True
         self.horizontal_land_check = False
         self.vertical_land_check = False
         self.terrain = constants.WATER

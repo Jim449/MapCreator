@@ -25,6 +25,7 @@ class Plate():
         self.sea_area: int = 0
         self.pole_type: int = 0
         self.claimed_regions: list[Region] = []
+        self.queued_regions: list[Region] = []
 
         # This keeps track of the plates boundaries
         # For a vertical line at y, store minimum and maximum x values
@@ -76,6 +77,7 @@ class Plate():
 
     def _get_circular_coordinate(self, value: int, max_value: int, horizontal: bool,
                                  end_of_region: bool = False) -> int:
+        """Gets longitude or latitude coordinates"""
         if value < 0:
             value += max_value
         elif value >= max_value:
@@ -96,7 +98,7 @@ class Plate():
 
     def _set_boundary(self, minimum: dict[int, int], maximum: dict[int, int],
                       key: int, value: int) -> None:
-        """Updates boundaries.
+        """Updates boundaries
 
         Arguments:
             self.west_end, self.east_end, y, x
@@ -119,10 +121,9 @@ class Plate():
         region.plate_x = x
         region.plate_y = y
         region.active = False
-        region.alive = True
         self.area += region.metrics.area
         self.currency -= region.metrics.cost
-        self.claimed_regions.append(region)
+        self.queued_regions.append(region)
         self._set_boundary(self.west_end, self.east_end, y, x)
         self._set_boundary(self.north_end, self.south_end, x, y)
 
@@ -143,10 +144,9 @@ class Plate():
     def _awaken_regions(self) -> int:
         """Counts amount of regions which the plate can expand from"""
         amount = 0
-        for region in self.claimed_regions:
-            if region.alive:
-                region.active = True
-                amount += 1
+        for region in self.queued_regions:
+            region.active = True
+            amount += 1
         return amount
 
     def restore(self) -> None:
@@ -166,14 +166,12 @@ class Plate():
             self.alive = False
             return 0
 
-        random.shuffle(self.claimed_regions)
+        random.shuffle(self.queued_regions)
 
-        # Possible to loop over claimed regions while adding new regions to the list?
-        for region in self.claimed_regions:
-            if self.currency <= 0 or active_regions == 0:
-                return self.currency
-            elif not region.active:
-                continue
+        while self.currency > 0 and active_regions > 0:
+            region = self.queued_regions[0]
+            if not region.active:
+                break
 
             for dir in range(1, 8, 2):
                 x, y = self._get_next_coordinates(
@@ -186,8 +184,9 @@ class Plate():
                     else:
                         self.claim_region(x, y)
             region.active = False
-            region.alive = False
             active_regions -= 1
+            self.claimed_regions.append(region)
+            self.queued_regions.remove(region)
         return self.currency
 
     def _horizontal_land_scan(self):
@@ -239,8 +238,29 @@ class Plate():
                 if self.world_map[y][x].plate == self.id:
                     self.world_map[y][x].vertical_land_check = True
 
+    def pole_border_correction(self):
+        """Disables globe circling in west end and east end coordinates.
+        In function, this should solve continent placement bugs
+        which resulted in unexpected water in the far east or west"""
+        start = min(self.east_end.keys())
+        end = max(self.east_end.keys())
+
+        for y in range(start, end):
+            for x in range(self.max_x):
+                if self.world_map[y][x].plate == self.id:
+                    self.west_end[y] = x
+                    break
+
+            for x in range(-1, self.max_x - 1, -1):
+                if self.world_map[y][x].plate == self.id:
+                    self.east_end[y] = x
+                    break
+
     def create_land(self):
         """Creates an ocean or continent on this plate, depending on plate type"""
+        if self.pole_type != 0:
+            self.pole_border_correction()
+
         if self.type == constants.LAND:
             for region in self.claimed_regions:
                 region.terrain = constants.LAND
@@ -262,14 +282,10 @@ class Plate():
                     self.sea_area += region.metrics.area
 
     def get_info(self) -> str:
-        if self.pole_type != 0:
-            west = -180
-            east = 180
-        else:
-            west = self._get_circular_coordinate(
-                min(self.west_end.values()), self.max_x, True)
-            east = self._get_circular_coordinate(
-                max(self.east_end.values()), self.max_x, True, True)
+        west = self._get_circular_coordinate(
+            min(self.west_end.values()), self.max_x, True)
+        east = self._get_circular_coordinate(
+            max(self.east_end.values()), self.max_x, True, True)
 
         north = self._get_circular_coordinate(
             min(self.north_end.values()), self.max_y, False)
