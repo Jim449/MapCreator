@@ -1,5 +1,6 @@
 from region import Region
 import random
+import math
 import constants
 
 
@@ -167,17 +168,27 @@ class Plate():
         return amount
 
     def restore(self) -> None:
-        """Restore expansion power"""
+        """Increases plate expansion currency"""
         self.currency += self.growth
 
     def expand(self) -> int:
-        """Expands the plate in random directions,
-        using currency and claimed region sizes to determine when to stop.
-        Returns remaining currency.
-        Plate is expanded only from regions claimed before method call.
-        If returned currency is positive, call again to complete expansion
+        """Expands the plate in random directions. Returns remaining growth currency.
+
+        Algorithm:
+            Randomly selects cells and expands from them in all directions.
+            Selected cell becomes unselectable.
+            Growth currency is decreased for each cell created.
+            Newly created cells cannot be selected until next method call.
+
+        End iteration if:
+            75% of selectable cells have be selected.
+            If currency is zero or negative. Expansion from selected cell is still completed.
+
+        Then:
+            Add more currency and call again until there's no room for expansion
         """
         active_regions = self._awaken_regions()
+        limit = math.ceil(active_regions * 0.75)
 
         if active_regions == 0:
             self.alive = False
@@ -185,7 +196,7 @@ class Plate():
 
         random.shuffle(self.queued_regions)
 
-        while self.currency > 0 and active_regions > 0:
+        while limit > 0 and self.currency > 0:
             region = self.queued_regions[0]
             if not region.active:
                 break
@@ -201,7 +212,7 @@ class Plate():
                     else:
                         self.claim_region(x, y)
             region.active = False
-            active_regions -= 1
+            limit -= 1
             self.claimed_regions.append(region)
             self.queued_regions.remove(region)
         return self.currency

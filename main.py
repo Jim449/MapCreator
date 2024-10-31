@@ -210,12 +210,21 @@ class Main(QtWidgets.QMainWindow):
         When finished, generates continents and paints the map"""
         if self.world.expand_plates():
             self.world.create_continents()
+
+            if self.precision == constants.REGION:
+                self.world.update_subregions_from_regions()
+            else:
+                self.world.update_regions_from_subregions()
+
             self.paint_world()
             self.paint_grid()
             self.paint_lines()
-        else:
+        elif self.precision == constants.REGION:
             self.paint_plates()
-            self.timer.singleShot(200, self.expand_plates)
+            self.timer.singleShot(500, self.expand_plates)
+        elif self.precision == constants.SUBREGION:
+            self.paint_plates()
+            self.timer.singleShot(25, self.expand_plates)
 
     def generate_world(self):
         """Generates tectonic plates and creats continents"""
@@ -249,7 +258,6 @@ class Main(QtWidgets.QMainWindow):
             odd_amount=supercontinents,
             odd_growth=super_growth,
             world_map=world_map)
-
         self.timer.singleShot(200, self.expand_plates)
 
     def view_plates(self):
@@ -279,20 +287,13 @@ Sea percentage: {sea_area / self.world.area:.0%}
             x = event.x()
             y = event.y()
 
-            if self.precision == constants.REGION:
-                header = "Region"
-                column = x // 20
-                row = y // 20
-                region = self.world.get_region(column, row)
-            else:
-                header = "Subregion"
-                column = x // 4
-                row = y // 4
-                region = self.world.get_subregion(column, row)
+            header = "Region"
+            column = x // 20
+            row = y // 20
+            region = self.world.get_region(column, row)
+
             try:
-                # No, I should get plate from subregion if I that is the precision
-                # Even if precision is changed, I still want this to work
-                plate = self.world.get_plate(column, row, self.precision)
+                plate = self.world.get_plate(column, row, constants.REGION)
                 self.info_label.setText(
                     f"{header}\n{region.get_info()}\n\n{plate.get_info()}")
             except IndexError:

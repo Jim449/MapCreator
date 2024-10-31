@@ -53,7 +53,7 @@ class PlateOptions():
         layout.addWidget(self.plate_margin_label)
 
         self.plate_margin = QtWidgets.QDoubleSpinBox()
-        self.plate_margin.setMinimum(0.1)
+        self.plate_margin.setMinimum(0.0)
         self.plate_margin.setMaximum(0.4)
         self.plate_margin.setSingleStep(0.05)
         self.plate_margin.setValue(0.20)

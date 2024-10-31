@@ -82,7 +82,7 @@ class World():
 
     def get_subregion_of_region(self, x: int, y: int, region_x: int, region_y: int) -> Region:
         """Returns the subregion at (x, y) within region at (region_x, region_y)"""
-        return self.subregion[region_y * 5 + y][region_x * 5 + x]
+        return self.subregions[region_y * 5 + y][region_x * 5 + x]
 
     def create_plates(self, land_amount: int, water_amount: int, odd_amount: int,
                       margin: float, island_rate: float,
@@ -140,6 +140,28 @@ class World():
         """Creates land and water on all plates"""
         for plate in self.plates:
             plate.create_land()
+
+    def update_regions_from_subregions(self):
+        """Sets region variables based on subregion variables"""
+        for y in range(self.height):
+            for x in range(self.length):
+                region = self.get_region(x, y)
+                # Takes the middle subregion
+                # You could calculate plate and terrain percentages of all subregions within region
+                # and grab the highest percentages but the the simpler approach should be good enough
+                subregion = self.get_subregion_of_region(2, 2, x, y)
+                region.plate = subregion.plate
+                region.terrain = subregion.terrain
+
+    def update_subregions_from_regions(self):
+        """Sets subregion variables based on region variables"""
+        for y in range(self.sub_height):
+            for x in range(self.sub_length):
+                ry = y // 5
+                region = self.get_region(x // 5, ry)
+                subregion = self.get_subregion(x, y)
+                subregion.plate = region.plate
+                subregion.terrain = region.terrain
 
     def get_plate(self, x: int, y: int, precision: str = "Region") -> Plate:
         """Returns the plate occupying the region at (x,y)
