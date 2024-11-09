@@ -175,25 +175,30 @@ class Plate():
             amount += 1
         return amount
 
+    def _awaken_blindly(self) -> tuple[int]:
+        """Allows regions to be used as starting point for expansion.
+        Returns a tuple.
+        First return value: regions not entirely surrounded by regions belonging to this plate.
+        Second return value: regions from which expansion may be possible"""
+        active = 0
+        free = 0
+        for region in self.queued_regions:
+            if region.free:
+                free += 1
+            region.active = True
+            active += 1
+        return (active, free)
+
     def restore(self) -> None:
         """Increases plate expansion currency"""
         self.currency += self.growth
 
     def expand(self) -> int:
         """Expands the plate in random directions. Returns remaining growth currency.
-
-        Algorithm:
-            Randomly selects cells and expands from them in all directions.
-            Selected cell becomes unselectable.
-            Growth currency is decreased for each cell created.
-            Newly created cells cannot be selected until next method call.
-
-        End iteration if:
-            75% of selectable cells have be selected.
-            If currency is zero or negative. Expansion from selected cell is still completed.
-
-        Then:
-            Add more currency and call again until there's no room for expansion
+        Plates will expand no faster than 1 cell per method call in any direction.
+        Plates will expand efficiently into vacant spaces.
+        If a plate has little space to expand, it will expand with greater focus
+        to claim the vacant spaces.
         """
         active_regions = self._awaken_regions()
         limit = math.ceil(active_regions * 0.75)
@@ -223,6 +228,51 @@ class Plate():
             limit -= 1
             self.claimed_regions.append(region)
             self.queued_regions.remove(region)
+        return self.currency
+
+    def expand_blindly(self):
+        """Expands the plate in random directions. Returns remaining growth currency.
+        Plates will expand no faster than 1 cell per method call in any direction.
+        Plates may expand inefficiently.
+        Plates expansion should not speed up even if expansion choices are limited"""
+        active_regions, free_regions = self._awaken_blindly()
+        limit = math.ceil(active_regions * 0.75)
+
+        if free_regions == 0:
+            self.alive = False
+            return 0
+
+        random.shuffle(self.queued_regions)
+
+        while limit > 0 and self.currency > 0:
+            region = self.queued_regions[0]
+            if not region.active:
+                break
+
+            for dir in range(1, 8, 2):
+                all_owned = True
+                x, y = self._get_next_coordinates(
+                    region.plate_x, region.plate_y, dir)
+                ix, iy = self._get_coordinates(x, y)
+                cell = self.world_map[iy][ix]
+
+                if cell.plate == -1:
+                    if iy == 0 or iy == self.max_y - 1:
+                        self.claim_pole(y)
+                    else:
+                        self.claim_region(x, y)
+                elif cell.plate != self.id:
+                    all_owned = False
+                    self.currency -= cell.metrics.cost
+
+            if all_owned:
+                region.active = False
+                self.claimed_regions.append(region)
+                self.queued_regions.remove(region)
+
+            region.free = False
+            limit -= 1
+
         return self.currency
 
     def _horizontal_land_scan(self):
@@ -323,7 +373,7 @@ class Plate():
                 row += 1
 
     def _descending_land_scan(self):
-        """Scans the plate diagonally, finding valid plate positions in northeast to southwest diagonal"""
+        """Scans the plate diagonally, finding valid land positions in northeast to southwest diagonal"""
         if self.type in (constants.NORTH, constants.NORTHEAST, constants.EAST):
             northeast_margin = 0
             southwest_margin = self.margin * 2

@@ -8,13 +8,24 @@ import constants
 
 
 class Main(QtWidgets.QMainWindow):
-
-    PLATE_COLORS = [QColor(180, 30, 30), QColor(30, 180, 30), QColor(30, 30, 180),
-                    QColor(180, 120, 30), QColor(
-                        30, 180, 120), QColor(120, 30, 180),
-                    QColor(180, 30, 120), QColor(
-                        120, 180, 30), QColor(30, 120, 180),
-                    QColor(180, 30, 180), QColor(180, 180, 30), QColor(30, 180, 180)]
+    # 1-RED, 5-BLUE, 10-GREEN, 13-YELLOW, 3-PURPLE, 6-LIGHTBLUE, 9-SEAGREEN
+    # 12-OLIVE, 15-ORANGE, 17-BROWN, 18-BLUEGRAY, 2-MAGENTA, 8-TEAL, 11-GRASS
+    # 14-LIGHTORANGE, 16-LIGHTRED
+    PLATE_COLORS = [QColor(244, 67, 54), QColor(229, 115, 115),
+                    QColor(63, 81, 181), QColor(121, 134, 203),
+                    QColor(76, 175, 80), QColor(129, 199, 132),
+                    QColor(255, 235, 59), QColor(255, 241, 118),
+                    QColor(156, 39, 176), QColor(186, 104, 200),
+                    QColor(33, 150, 243), QColor(100, 181, 246),
+                    QColor(205, 220, 57), QColor(220, 231, 117),
+                    QColor(255, 152, 0), QColor(255, 183, 77),
+                    QColor(121, 85, 72), QColor(161, 136, 127),
+                    QColor(96, 125, 139), QColor(144, 164, 174),
+                    QColor(233, 30, 99), QColor(240, 98, 146),
+                    QColor(0, 188, 212), QColor(77, 208, 225),
+                    QColor(139, 195, 74), QColor(174, 213, 129),
+                    QColor(255, 193, 7), QColor(255, 213, 79),
+                    QColor(255, 87, 34), QColor(255, 138, 101)]
 
     def __init__(self):
         super().__init__()
@@ -98,29 +109,30 @@ class Main(QtWidgets.QMainWindow):
         """Paints tectonic plates. Unclaimed regions are painted black"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
+        painter.fillRect(0, 0, 1440, 720, Qt.black)
 
         if self.precision == constants.SUBREGION:
-            map = self.world.subregions
             length = self.world.sub_length
-            height = self.world.sub_height
         else:
-            map = self.world.regions
             length = self.world.length
-            height = self.world.height
 
         point = 1440 // length
         pen.setWidth(point)
 
-        for y in range(height):
-            for x in range(length):
-                region = map[y][x]
-                if region.plate == -1:
-                    pen.setColor(Qt.black)
-                else:
-                    pen.setColor(Main.PLATE_COLORS[region.plate])
+        for plate in self.world.plates:
+            pen.setColor(Main.PLATE_COLORS[plate.id * 2])
+            painter.setPen(pen)
 
-                painter.setPen(pen)
-                painter.drawPoint(point//2 + x*point, point//2 + y*point)
+            for region in plate.claimed_regions:
+                painter.drawPoint(point//2 + region.x*point,
+                                  point//2 + region.metrics.y*point)
+
+            pen.setColor(Main.PLATE_COLORS[plate.id * 2 + 1])
+            painter.setPen(pen)
+
+            for region in plate.queued_regions:
+                painter.drawPoint(point//2 + region.x*point,
+                                  point//2 + region.metrics.y*point)
         painter.end()
         self.update()
 
@@ -236,7 +248,7 @@ class Main(QtWidgets.QMainWindow):
             max_growth = self.plate_options.max_growth.value()*4
             super_growth = 32
         else:
-            self.precision = Main.REGION
+            self.precision = constants.REGION
             world_map = self.world.regions
             min_growth = self.plate_options.min_growth.value()
             max_growth = self.plate_options.max_growth.value()

@@ -125,7 +125,9 @@ class World():
                 continue
 
             plate.restore()
-            plate.expand()
+            # Try the blind expansion method
+            # It's very slow. Keeps running for too long even when it's 99% complete
+            plate.expand_blindly()
 
         return finished
 
