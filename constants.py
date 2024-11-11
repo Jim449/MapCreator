@@ -36,6 +36,12 @@ def get_type(type: int) -> str:
     return type_names[type]
 
 
+def get_type_value(type: str) -> int:
+    type_values = {"Center": 0, "North": 1, "Northeast": 2, "East": 3, "Southeast": 4, "South": 5,
+                   "Southwest": 6, "West": 7, "Northwest": 8, "Land": 9, "Water": 10, "Mountain": 11}
+    return type_values[type]
+
+
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
     """Returns new coordinates (x,y) after travelling once in a direction"""
     if dir == NORTH:

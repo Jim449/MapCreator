@@ -216,7 +216,7 @@ class Plate():
             self.queued_regions.remove(region)
         return self.currency
 
-    def expand_blindly(self):
+    def expand_blindly(self) -> int:
         """Expands the plate in random directions. Returns remaining growth currency.
         Plates will expand no faster than 1 cell per method call in any direction.
         Plates expansion should not speed up even if expansion choices are limited"""
@@ -251,7 +251,7 @@ class Plate():
             limit -= 1
         return self.currency
 
-    def _horizontal_land_scan(self):
+    def _horizontal_land_scan(self) -> None:
         """Scans plate horizontally, finding valid land positions on each vertical"""
         if self.type in (constants.WEST, constants.CENTER, constants.EAST):
             north_margin = self.margin
@@ -283,7 +283,7 @@ class Plate():
                     else:
                         break
 
-    def _vertical_land_scan(self):
+    def _vertical_land_scan(self) -> None:
         """Scans plate vertically, finding valid land positions on each horizontal"""
 
         if self.pole_type in (constants.NORTH, constants.SOUTH):
@@ -320,7 +320,7 @@ class Plate():
                     else:
                         break
 
-    def _ascending_land_scan(self):
+    def _ascending_land_scan(self) -> None:
         """Scans the plate diagonally, finding valid land position in northwest to southeast diagonal"""
         if self.type in (constants.NORTH, constants.WEST, constants.NORTHWEST):
             northwest_margin = 0
@@ -351,7 +351,7 @@ class Plate():
                         break
                 row += 1
 
-    def _descending_land_scan(self):
+    def _descending_land_scan(self) -> None:
         """Scans the plate diagonally, finding valid land positions in northeast to southwest diagonal"""
         if self.type in (constants.NORTH, constants.NORTHEAST, constants.EAST):
             northeast_margin = 0
@@ -382,7 +382,7 @@ class Plate():
                         break
                 row += 1
 
-    def _pole_border_correction(self):
+    def _pole_border_correction(self) -> None:
         """Disables globe circling in west end and east end coordinates.
         In function, this should solve continent placement bugs
         which resulted in unexpected water in the far east or west"""
@@ -400,8 +400,10 @@ class Plate():
                     self.east_end[y] = x
                     break
 
-    def create_land(self):
+    def create_land(self) -> None:
         """Creates an ocean or continent on this plate, depending on plate type"""
+        self.land_area = 0
+        self.sea_area = 0
 
         if self.pole_type != 0:
             self._pole_border_correction()
@@ -433,7 +435,20 @@ class Plate():
                     region.terrain = constants.WATER
                     self.sea_area += region.metrics.area
 
+    def sink(self) -> None:
+        """Clears all land from this plate. Clears land and sea area calculations"""
+        self.land_area = 0
+        self.sea_area = 0
+
+        for region in self.claimed_regions:
+            region.terrain = constants.WATER
+            region.horizontal_land_check = False
+            region.vertical_land_check = False
+            region.ascending_land_check = False
+            region.descending_land_check = False
+
     def get_info(self) -> str:
+        """Returns plate information"""
         west = self._get_circular_coordinate(
             min(self.west_end.values()), self.max_x, True)
         east = self._get_circular_coordinate(
