@@ -31,6 +31,8 @@ class World():
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
 
+        self.fixed_growth = True
+
         for y in range(height):
             metrics = self._get_region_metric(
                 y, length, height, self.region_height)
@@ -59,7 +61,8 @@ class World():
         # Cost influences how quickly an area can expand, by setting a price for expansion to a region
         # This value should be standardized for all choices of length and area
         # I haven't done the calculations, but this seems to standardize to a maximum of 1.00
-        cost = round(area * length**2 / self.circumference**2, 2)
+        cost = round(area * length**2 / self.circumference**2, 4)
+        # I want to see 4 decimals. Still not higher than 1? Change back to 2 later
 
         return RegionMetrics(area=area, top_stretch=top_width, bottom_stretch=bottom_width,
                              vertical_stretch=vertical_stretch, cost=cost, y=y,
@@ -87,18 +90,23 @@ class World():
     def create_plates(self, land_amount: int, water_amount: int, odd_amount: int,
                       margin: float, island_rate: float,
                       min_growth: int, max_growth: int, odd_growth: int,
-                      world_map: list[list[Region]]) -> None:
+                      world_map: list[list[Region]], fixed_growth: bool) -> None:
         """Creates the starting points of tectonic plates at random coordinates"""
+        self.fixed_growth = fixed_growth
+
         for id in range(land_amount + water_amount + odd_amount):
             if id >= odd_amount + land_amount:
                 type = constants.WATER
                 growth = random.randrange(min_growth, max_growth + 1)
+                relative_growth = 0.3
             elif id >= odd_amount:
                 type = random.randrange(9)
                 growth = random.randrange(min_growth, max_growth + 1)
+                relative_growth = 0.3
             else:
                 type = constants.CENTER
                 growth = odd_growth
+                relative_growth = 0.6
 
             if id < odd_amount:
                 x = len(world_map[0]) // 2
@@ -111,7 +119,8 @@ class World():
                         break
 
             self.plates.append(Plate(id=id, world_map=world_map, start_x=x, start_y=y,
-                                     type=type, margin=margin, island_rate=island_rate, growth=growth))
+                                     type=type, margin=margin, island_rate=island_rate, growth=growth,
+                                     relative_growth=relative_growth))
 
     def expand_plates(self) -> bool:
         """Expands all tectonic plates once. Level of expansion is determined by plate growth settings.
@@ -124,10 +133,10 @@ class World():
             else:
                 continue
 
-            plate.restore()
-            # Try the blind expansion method
-            # It's very slow. Keeps running for too long even when it's 99% complete
-            plate.expand_blindly()
+            if self.fixed_growth:
+                plate.expand()
+            else:
+                plate.expand_blindly()
 
         return finished
 

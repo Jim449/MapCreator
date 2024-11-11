@@ -19,7 +19,6 @@ class Region():
         self.plate_x: int = 0
         self.plate_y: int = 0
         self.active: bool = True
-        self.free: bool = True
 
         self.horizontal_land_check = False
         self.vertical_land_check = False
@@ -33,5 +32,6 @@ class Region():
 Longitude: {self.west} to {self.east}
 Length: {self.metrics.top_stretch:,} to {self.metrics.bottom_stretch:,} km
 Height: {self.metrics.vertical_stretch:,} km
-Area: {self.metrics.area:,} km2"""
+Area: {self.metrics.area:,} km2
+Cost: {self.metrics.cost:.4}"""
         return text

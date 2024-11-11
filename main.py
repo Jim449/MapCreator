@@ -241,6 +241,8 @@ class Main(QtWidgets.QMainWindow):
     def generate_world(self):
         """Generates tectonic plates and creats continents"""
 
+        self.plate_options.generate_button.setEnabled(False)
+
         if self.plate_options.high_resolution.isChecked():
             self.precision = constants.SUBREGION
             world_map = self.world.subregions
@@ -259,6 +261,11 @@ class Main(QtWidgets.QMainWindow):
         else:
             supercontinents = 0
 
+        if self.plate_options.algorithm.currentText() == "Fixed growth":
+            fixed_growth = True
+        else:
+            fixed_growth = False
+
         # Needs to sink current plates if there are any
         self.world.create_plates(
             land_amount=self.plate_options.land_plates.value(),
@@ -269,7 +276,8 @@ class Main(QtWidgets.QMainWindow):
             max_growth=max_growth,
             odd_amount=supercontinents,
             odd_growth=super_growth,
-            world_map=world_map)
+            world_map=world_map,
+            fixed_growth=fixed_growth)
         self.timer.singleShot(200, self.expand_plates)
 
     def view_plates(self):

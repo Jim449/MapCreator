@@ -8,6 +8,14 @@ class PlateOptions():
         self.header = QtWidgets.QLabel("Tectonic plate options")
         layout.addWidget(self.header)
 
+        self.algorithm_label = QtWidgets.QLabel("Algorithm")
+        layout.addWidget(self.algorithm_label)
+
+        self.algorithm = QtWidgets.QComboBox()
+        self.algorithm.addItem("Relative growth")
+        self.algorithm.addItem("Fixed growth")
+        layout.addWidget(self.algorithm)
+
         self.min_growth_label = QtWidgets.QLabel("Miniumum growth rate")
         layout.addWidget(self.min_growth_label)
 

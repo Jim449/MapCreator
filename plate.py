@@ -7,7 +7,7 @@ import constants
 class Plate():
     def __init__(self, id: int, world_map: list[list[Region]], start_x: int, start_y: int,
                  type: int = constants.CENTER, margin: float = 0.25, island_rate: float = 0.1,
-                 growth: int = 4):
+                 growth: int = 4, relative_growth: float = 0.3):
         self.id: int = id
         self.world_map: list[list[Region]] = world_map
         self.start_x: int = start_x
@@ -18,6 +18,7 @@ class Plate():
         self.margin: float = margin
         self.island_rate: float = island_rate
         self.growth: int = growth
+        self.relative_growth = relative_growth
 
         self.currency: float = growth
         self.alive: bool = True
@@ -159,6 +160,8 @@ class Plate():
         for x in range(self.max_x):
             self.claim_region(x, y)
 
+        self.relative_growth = 0.1
+
         # Have land centering at the pole
         if y == 0 and self.type != constants.WATER:
             self.type = constants.NORTH
@@ -175,24 +178,6 @@ class Plate():
             amount += 1
         return amount
 
-    def _awaken_blindly(self) -> tuple[int]:
-        """Allows regions to be used as starting point for expansion.
-        Returns a tuple.
-        First return value: regions not entirely surrounded by regions belonging to this plate.
-        Second return value: regions from which expansion may be possible"""
-        active = 0
-        free = 0
-        for region in self.queued_regions:
-            if region.free:
-                free += 1
-            region.active = True
-            active += 1
-        return (active, free)
-
-    def restore(self) -> None:
-        """Increases plate expansion currency"""
-        self.currency += self.growth
-
     def expand(self) -> int:
         """Expands the plate in random directions. Returns remaining growth currency.
         Plates will expand no faster than 1 cell per method call in any direction.
@@ -202,6 +187,7 @@ class Plate():
         """
         active_regions = self._awaken_regions()
         limit = math.ceil(active_regions * 0.75)
+        self.currency += self.growth
 
         if active_regions == 0:
             self.alive = False
@@ -233,12 +219,12 @@ class Plate():
     def expand_blindly(self):
         """Expands the plate in random directions. Returns remaining growth currency.
         Plates will expand no faster than 1 cell per method call in any direction.
-        Plates may expand inefficiently.
         Plates expansion should not speed up even if expansion choices are limited"""
-        active_regions, free_regions = self._awaken_blindly()
+        active_regions = self._awaken_regions()
         limit = math.ceil(active_regions * 0.75)
+        self.currency += active_regions * self.relative_growth
 
-        if free_regions == 0:
+        if active_regions == 0:
             self.alive = False
             return 0
 
@@ -250,29 +236,19 @@ class Plate():
                 break
 
             for dir in range(1, 8, 2):
-                all_owned = True
                 x, y = self._get_next_coordinates(
                     region.plate_x, region.plate_y, dir)
                 ix, iy = self._get_coordinates(x, y)
-                cell = self.world_map[iy][ix]
 
-                if cell.plate == -1:
+                if self.world_map[iy][ix].plate == -1:
                     if iy == 0 or iy == self.max_y - 1:
                         self.claim_pole(y)
                     else:
                         self.claim_region(x, y)
-                elif cell.plate != self.id:
-                    all_owned = False
-                    self.currency -= cell.metrics.cost
-
-            if all_owned:
-                region.active = False
-                self.claimed_regions.append(region)
-                self.queued_regions.remove(region)
-
-            region.free = False
+            region.active = False
+            self.claimed_regions.append(region)
+            self.queued_regions.remove(region)
             limit -= 1
-
         return self.currency
 
     def _horizontal_land_scan(self):
@@ -292,8 +268,9 @@ class Plate():
             start = self.north_end[column]
             end = self.south_end[column]
 
-            first_skip = length * north_margin
-            include = length - first_skip - length * south_margin
+            first_skip = int(length * north_margin)
+            second_skip = int(length * south_margin)
+            include = length - first_skip - second_skip
 
             for row in range(start, end + 1):
                 x, y = self._get_coordinates(column, row)
@@ -328,8 +305,9 @@ class Plate():
             start = self.west_end[row]
             end = self.east_end[row]
 
-            first_skip = length * west_margin
-            include = length - first_skip - length * east_margin
+            first_skip = int(length * west_margin)
+            second_skip = int(length * east_margin)
+            include = length - first_skip - second_skip
 
             for column in range(start, end + 1):
                 x, y = self._get_coordinates(column, row)
@@ -355,8 +333,9 @@ class Plate():
             southeast_margin = 0
 
         for start_x, length in self.ascending_distance.items():
-            first_skip = length * northwest_margin
-            include = length - first_skip - length * southeast_margin
+            first_skip = int(length * northwest_margin)
+            second_skip = int(length * southeast_margin)
+            include = length - first_skip - second_skip
             row = 0
 
             for column in range(start_x, start_x + self.max_x):
@@ -385,8 +364,9 @@ class Plate():
             southwest_margin = 0
 
         for start_x, length in self.descending_distance.items():
-            first_skip = length * northeast_margin
-            include = length - first_skip - length * southwest_margin
+            first_skip = int(length * northeast_margin)
+            second_skip = int(length * southwest_margin)
+            include = length - first_skip - second_skip
             row = 0
 
             for column in range(start_x, start_x - self.max_x, -1):
