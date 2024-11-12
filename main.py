@@ -308,16 +308,25 @@ class Main(QtWidgets.QMainWindow):
         self.view_continents()
 
     def create_mountains_on_land(self):
+        """Creates mountain ranges on selected plate, where it meets a continental plate"""
         for region in self.selected_plate.find_boundary_offset(0, constants.LAND):
             if region.terrain == constants.LAND:
                 region.terrain = constants.MOUNTAIN
         self.view_continents()
 
     def create_mountains_by_sea(self):
+        """Creates mountain ranges on selected plate, where it meets an oceanic plate"""
         offset = self.continent_options.mountain_offset.value()
         for region in self.selected_plate.find_boundary_offset(offset, constants.WATER):
             if region.terrain == constants.LAND:
                 region.terrain = constants.MOUNTAIN
+        self.view_continents()
+
+    def erase_mountains(self):
+        """Removes all mountains from the selected plate"""
+        for region in self.selected_plate.claimed_regions:
+            if region.terrain == constants.MOUNTAIN:
+                region.terrain = constants.LAND
         self.view_continents()
 
     def view_plates(self):

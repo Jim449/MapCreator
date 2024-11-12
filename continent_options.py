@@ -54,7 +54,7 @@ class ContinentOptions():
 
         self.mountain_offset = QtWidgets.QSpinBox()
         self.mountain_offset.setMinimum(0)
-        self.mountain_offset.setMaximum(5)
+        self.mountain_offset.setMaximum(20)
         self.mountain_offset.setSingleStep(1)
         self.mountain_offset.setValue(1)
         layout.addWidget(self.mountain_offset)
@@ -64,6 +64,7 @@ class ContinentOptions():
         layout.addWidget(self.sea_mountain)
 
         self.erase_mountain = QtWidgets.QPushButton("Erase mountains")
+        self.erase_mountain.clicked.connect(main.erase_mountains)
         layout.addWidget(self.erase_mountain)
 
         layout.addStretch()

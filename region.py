@@ -32,6 +32,11 @@ class Region():
         self.south_boundary = False
         self.west_boundary = False
 
+    def is_boundary(self):
+        """Returns true if this region is at a plate boundary"""
+        return (self.north_boundary or self.east_boundary
+                or self.south_boundary or self.west_boundary)
+
     def get_info(self) -> str:
         text = f"""Latitude: {self.metrics.south} to {self.metrics.north}
 Longitude: {self.west} to {self.east}

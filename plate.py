@@ -482,7 +482,25 @@ class Plate():
 
             if by_terrain == outskirts or \
                     (by_terrain == constants.LAND and outskirts == constants.MOUNTAIN):
-                result.append(self.world_map[y][x])
+                # Saves me some calculations
+                if distance == 0:
+                    result.append(region)
+                    continue
+
+                if x != region.x and y != region.metrics.y:
+                    # The diagonal alone won't suffice. Take the horizontal and vertical too
+                    # Leave a non-mountain margin since distance > 0
+                    vertical = self.world_map[region.metrics.y][x]
+                    if vertical.plate == self.id and vertical.is_boundary() == False:
+                        result.append(vertical)
+
+                    horizontal = self.world_map[y][region.x]
+                    if horizontal.plate == self.id and horizontal.is_boundary() == False:
+                        result.append(horizontal)
+
+                inner = self.world_map[y][x]
+                if inner.plate == self.id and inner.is_boundary() == False:
+                    result.append(self.world_map[y][x])
         return result
 
     def get_info(self) -> str:
