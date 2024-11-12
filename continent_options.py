@@ -46,9 +46,21 @@ class ContinentOptions():
         layout.addWidget(self.mountain_label)
 
         self.land_mountain = QtWidgets.QPushButton("Generate by land")
+        self.land_mountain.clicked.connect(main.create_mountains_on_land)
         layout.addWidget(self.land_mountain)
 
+        self.mountain_offset_label = QtWidgets.QLabel("Distance to shore")
+        layout.addWidget(self.mountain_offset_label)
+
+        self.mountain_offset = QtWidgets.QSpinBox()
+        self.mountain_offset.setMinimum(0)
+        self.mountain_offset.setMaximum(5)
+        self.mountain_offset.setSingleStep(1)
+        self.mountain_offset.setValue(1)
+        layout.addWidget(self.mountain_offset)
+
         self.sea_mountain = QtWidgets.QPushButton("Generate by sea")
+        self.sea_mountain.clicked.connect(main.create_mountains_by_sea)
         layout.addWidget(self.sea_mountain)
 
         self.erase_mountain = QtWidgets.QPushButton("Erase mountains")

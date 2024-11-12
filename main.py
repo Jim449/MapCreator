@@ -141,6 +141,9 @@ class Main(QtWidgets.QMainWindow):
     def has_plate_border(self, map: list[Region], region: Region, x: int, y: int,
                          dir: int) -> bool:
         """Returns true if the region has a plate border with an adjacent region"""
+        # I could use instance variables of regions instead
+        # It only works for subregions though
+        # I need a solution for regions
         nx, ny = constants.get_next_coordinates(x, y, dir)
 
         try:
@@ -230,6 +233,7 @@ class Main(QtWidgets.QMainWindow):
             else:
                 self.world.update_regions_from_subregions()
 
+            self.world.find_plate_boundaries()
             self.paint_world()
             self.paint_grid()
             self.paint_lines()
@@ -283,6 +287,8 @@ class Main(QtWidgets.QMainWindow):
         self.timer.singleShot(200, self.expand_plates)
 
     def add_plate_type(self):
+        """Creates land using selected plate type and sea margin.
+        Existing land is retained"""
         type = constants.get_type_value(
             self.continent_options.type.currentText())
         self.selected_plate.margin = self.continent_options.plate_margin.value()
@@ -291,6 +297,8 @@ class Main(QtWidgets.QMainWindow):
         self.view_continents()
 
     def set_plate_type(self):
+        """Creates land using selected plate type and sea margin.
+        Existing land is deleted"""
         type = constants.get_type_value(
             self.continent_options.type.currentText())
         self.selected_plate.margin = self.continent_options.plate_margin.value()
@@ -299,16 +307,32 @@ class Main(QtWidgets.QMainWindow):
         self.selected_plate.create_land()
         self.view_continents()
 
+    def create_mountains_on_land(self):
+        for region in self.selected_plate.find_boundary_offset(0, constants.LAND):
+            if region.terrain == constants.LAND:
+                region.terrain = constants.MOUNTAIN
+        self.view_continents()
+
+    def create_mountains_by_sea(self):
+        offset = self.continent_options.mountain_offset.value()
+        for region in self.selected_plate.find_boundary_offset(offset, constants.WATER):
+            if region.terrain == constants.LAND:
+                region.terrain = constants.MOUNTAIN
+        self.view_continents()
+
     def view_plates(self):
+        """Paints the plates"""
         self.paint_plates()
         self.paint_lines()
 
     def view_continents(self):
+        """Paints the world map"""
         self.paint_world()
         self.paint_grid()
         self.paint_lines()
 
     def view_world_info(self):
+        """Shows world information"""
         sea_area = self.world.get_sea_area()
 
         self.info_label.setText(f"""World

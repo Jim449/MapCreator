@@ -174,6 +174,24 @@ class World():
                 subregion.plate = region.plate
                 subregion.terrain = region.terrain
 
+    def find_plate_boundaries(self):
+        """Finds plate boundaries on a subregion level"""
+        for y in range(self.sub_height - 1):
+            for x in range(self.sub_length):
+                nx = (x + 1) % self.sub_length
+                ny = y + 1
+                region = self.subregions[y][x]
+                east = self.subregions[y][nx]
+                south = self.subregions[ny][x]
+
+                if region.plate != east.plate:
+                    region.east_boundary = True
+                    east.west_boundary = True
+
+                if region.plate != south.plate:
+                    region.south_boundary = True
+                    south.north_boundary = True
+
     def get_plate(self, x: int, y: int, precision: str = "Region") -> Plate:
         """Returns the plate occupying the region at (x,y)
 

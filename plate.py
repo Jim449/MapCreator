@@ -70,7 +70,7 @@ class Plate():
 
     def _get_next_coordinates(self, x: int, y: int, dir: int) -> tuple[int]:
         """Returns new coordinates (x,y) after travelling once in a direction.
-        Give direction north=0, east=1, south=2, west=3"""
+        Give direction NORTH, EAST, SOUTH or WEST from constants"""
         if dir == constants.NORTH:
             return (x, y-1)
         elif dir == constants.EAST:
@@ -160,7 +160,7 @@ class Plate():
         for x in range(self.max_x):
             self.claim_region(x, y)
 
-        self.relative_growth = 0.1
+        self.relative_growth = 0.05
 
         # Have land centering at the pole
         if y == 0 and self.type != constants.WATER:
@@ -446,6 +446,44 @@ class Plate():
             region.vertical_land_check = False
             region.ascending_land_check = False
             region.descending_land_check = False
+
+    def find_boundary_offset(self, distance: int, by_terrain: int) -> list[Region]:
+        result = []
+
+        for region in self.claimed_regions:
+            if region.north_boundary == region.south_boundary \
+                    and region.east_boundary == region.west_boundary:
+                continue
+
+            x = region.x
+            y = region.metrics.y
+            outer_x = region.x
+            outer_y = region.metrics.y
+
+            if region.north_boundary and region.south_boundary == False:
+                y = region.metrics.y + distance
+                outer_y = region.metrics.y - 1
+            if region.east_boundary and region.west_boundary == False:
+                x = (region.x - distance) % self.max_x
+                outer_x = (region.x + 1) % self.max_x
+            if region.south_boundary and region.north_boundary == False:
+                y = region.metrics.y - distance
+                outer_y = region.metrics.y + 1
+            if region.west_boundary and region.east_boundary == False:
+                x = (region.x + distance) % self.max_x
+                outer_x = (region.x - 1) % self.max_x
+
+            if y < 0:
+                y = 0
+            elif y >= self.max_y:
+                y = self.max_y - 1
+
+            outskirts = self.world_map[outer_y][outer_x].terrain
+
+            if by_terrain == outskirts or \
+                    (by_terrain == constants.LAND and outskirts == constants.MOUNTAIN):
+                result.append(self.world_map[y][x])
+        return result
 
     def get_info(self) -> str:
         """Returns plate information"""

@@ -27,6 +27,11 @@ class Region():
 
         self.terrain = constants.WATER
 
+        self.north_boundary = False
+        self.east_boundary = False
+        self.south_boundary = False
+        self.west_boundary = False
+
     def get_info(self) -> str:
         text = f"""Latitude: {self.metrics.south} to {self.metrics.north}
 Longitude: {self.west} to {self.east}
