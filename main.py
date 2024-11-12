@@ -3,7 +3,7 @@ from PyQt5.QtCore import QEvent, QTimer, Qt
 from PyQt5.QtGui import QColor
 from world import World
 from plate_options import PlateOptions
-from plate_adjustments import PlateAdjustments
+from continent_options import ContinentOptions
 from region import Region
 from plate import Plate
 import constants
@@ -99,7 +99,7 @@ class Main(QtWidgets.QMainWindow):
         self.map_layout.addStretch()
 
         self.plate_options = PlateOptions(self, self.plate_option_layout)
-        self.plate_adjustments = PlateAdjustments(self, self.info_layout)
+        self.continent_options = ContinentOptions(self, self.info_layout)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(self.layout)
@@ -284,14 +284,16 @@ class Main(QtWidgets.QMainWindow):
 
     def add_plate_type(self):
         type = constants.get_type_value(
-            self.plate_adjustments.type.currentText())
+            self.continent_options.type.currentText())
+        self.selected_plate.margin = self.continent_options.plate_margin.value()
         self.selected_plate.type = type
         self.selected_plate.create_land()
         self.view_continents()
 
     def set_plate_type(self):
         type = constants.get_type_value(
-            self.plate_adjustments.type.currentText())
+            self.continent_options.type.currentText())
+        self.selected_plate.margin = self.continent_options.plate_margin.value()
         self.selected_plate.type = type
         self.selected_plate.sink()
         self.selected_plate.create_land()
@@ -332,8 +334,10 @@ Sea percentage: {sea_area / self.world.area:.0%}
             try:
                 self.selected_plate = self.world.get_plate(
                     column, row, constants.REGION)
-                self.plate_adjustments.type.setCurrentIndex(
+                self.continent_options.type.setCurrentIndex(
                     self.selected_plate.type)
+                self.continent_options.plate_margin.setValue(
+                    self.selected_plate.margin)
                 self.info_label.setText(
                     f"{header}\n{region.get_info()}\n\n{self.selected_plate.get_info()}")
             except IndexError:
