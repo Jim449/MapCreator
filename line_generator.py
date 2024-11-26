@@ -3,14 +3,15 @@ import random
 import constants
 
 
-class OffsetCell():
-    """Describes the intersection between four cells.
-    In other words, it's a cell offset by 0.5 length x and 0.5 height y.
-    A cell is anything that describes a position in a grid.
-    OffsetCells are used for generating random boundaries"""
+class LineGenerator():
+    """Used for creating random paths or borders.
+    The LineGenerator describes the area where the path should be created.
+    When creating borders, a LineGenerator typically describes
+    the intersection between for cells (regions, subregions etc.)
+    In other words, it's a cell offset by 0.5 length x and 0.5 height y."""
 
     def __init__(self, x: int, y: int, length: int, height: int):
-        """Creates an offset cell at x, y"""
+        """Creates a line generator cell at x, y"""
         self.x = x
         self.y = y
         self.length = length
@@ -219,27 +220,27 @@ class OffsetCell():
 
 
 if __name__ == "__main__":
-    northeast = OffsetCell(1, 0, 5, 5)
+    northeast = LineGenerator(1, 0, 5, 5)
     northeast.set_entrance(constants.WEST)
     northeast.set_exit(constants.SOUTH)
     northeast.random_walk()
     northeast.set_terrain(1, 0, False)
 
-    southeast = OffsetCell(1, 1, 5, 5)
+    southeast = LineGenerator(1, 1, 5, 5)
     southeast.set_entrance(constants.NORTH)
     southeast.set_exit(constants.WEST)
     southeast.inherit_start(northeast)
     southeast.random_walk()
     southeast.set_terrain(1, 0, False)
 
-    southwest = OffsetCell(0, 1, 5, 5)
+    southwest = LineGenerator(0, 1, 5, 5)
     southwest.set_entrance(constants.EAST)
     southwest.set_exit(constants.NORTH)
     southwest.inherit_start(southeast)
     southwest.random_walk()
     southwest.set_terrain(1, 0, False)
 
-    northwest = OffsetCell(0, 0, 5, 5)
+    northwest = LineGenerator(0, 0, 5, 5)
     northwest.set_entrance(constants.SOUTH)
     northwest.set_exit(constants.EAST)
     northwest.inherit_start(southwest)

@@ -54,3 +54,11 @@ def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
         return (x-1, y)
     else:
         return (x, y)
+
+
+def flip_direction(dir: int) -> int:
+    """Returns the opposite direction"""
+    dir += 4
+    if dir > 8:
+        dir -= 8
+    return dir

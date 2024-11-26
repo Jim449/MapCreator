@@ -448,6 +448,9 @@ class Plate():
             region.descending_land_check = False
 
     def find_boundary_offset(self, distance: int, by_terrain: int) -> list[Region]:
+        """Finds all regions with the given distance from the plate boundary.
+        Only applies if the terrain outside of the plate is belongs to the given
+        terrain cathegory, LAND or WATER."""
         result = []
 
         for region in self.claimed_regions:
