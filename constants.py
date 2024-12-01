@@ -31,15 +31,17 @@ def get_color(terrain: int) -> QColor:
 
 
 def get_type(type: int) -> str:
+    """Translates an integer constant into a string type"""
     type_names = {0: "center", 1: "north", 2: "northeast", 3: "east", 4: "southeast", 5: "south",
                   6: "southwest", 7: "west", 8: "northwest", 9: "land", 10: "water", 11: "mountain"}
     return type_names[type]
 
 
 def get_type_value(type: str) -> int:
-    type_values = {"Center": 0, "North": 1, "Northeast": 2, "East": 3, "Southeast": 4, "South": 5,
-                   "Southwest": 6, "West": 7, "Northwest": 8, "Land": 9, "Water": 10, "Mountain": 11}
-    return type_values[type]
+    """Translates a string type into an integer constant"""
+    type_values = {"center": 0, "north": 1, "northeast": 2, "wast": 3, "southeast": 4, "south": 5,
+                   "southwest": 6, "west": 7, "northwest": 8, "land": 9, "water": 10, "mountain": 11}
+    return type_values[type.lower()]
 
 
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
@@ -59,33 +61,27 @@ def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
 def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[int]:
     """Returns coordinates (x,y) after travelling once in an direction.
     The result is a valid, positive index of a two-dimensional list"""
-    if dir == NORTH:
-        coordinates = (x, y-1)
-    elif dir == EAST:
-        coordinates = (x+1, y)
-    elif dir == SOUTH:
-        coordinates = (x, y+1)
-    elif dir == WEST:
-        coordinates = (x-1, y)
-    elif dir == NORTHEAST:
-        coordinates = (x+1, y-1)
-    elif dir == SOUTHEAST:
-        coordinates = (x+1, y+1)
-    elif dir == SOUTHWEST:
-        coordinates = (x-1, y+1)
-    elif dir == NORTHWEST:
-        coordinates = (x-1, y-1)
-    else:
-        return (x, y)
+    nx = x
+    ny = y
 
-    coordinates[0] = coordinates[0] % length
+    if dir in (NORTH, NORTHEAST, NORTHWEST):
+        ny -= 1
+    elif dir in (SOUTH, SOUTHEAST, SOUTHWEST):
+        ny += 1
 
-    if coordinates[1] >= height:
-        coordinates[1] = height
-    elif coordinates[1] < 0:
-        coordinates[1] = 0
+    if dir in (EAST, NORTHEAST, SOUTHEAST):
+        nx += 1
+    elif dir in (WEST, NORTHWEST, SOUTHWEST):
+        nx -= 1
 
-    return coordinates
+    nx = nx % length
+
+    if ny >= height:
+        ny = height
+    elif ny < 0:
+        ny = 0
+
+    return (nx, ny)
 
 
 def within_bounds(x: int, y: int, length: int, height: int) -> bool:
@@ -110,9 +106,9 @@ def turn_direction(dir: int) -> int:
     return dir
 
 
-def angle_direction(dir: int) -> int:
-    """Returns the direction with an angle of -45 degrees to the given direction"""
-    dir += 1
-    if dir > 0:
+def angle_direction(dir: int, steps_of_eight: int) -> int:
+    """Rotates a direction in clockwise steps of an eight circle. Returns the new direction"""
+    dir += steps_of_eight
+    if dir > 8:
         dir -= 8
     return dir

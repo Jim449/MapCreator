@@ -83,7 +83,7 @@ class World():
     def get_next_region(self, x: int, y: int, dir: int) -> Region:
         """Returns a region adjacent to (x,y)"""
         nx, ny = constants.get_next_index(x, y, dir, self.length, self.height)
-        return self.regions[y][x]
+        return self.regions[ny][nx]
 
     def get_subregion(self, x: int, y: int) -> Region:
         """Returns the subregion at (x,y)"""
@@ -232,9 +232,15 @@ class World():
                     area += region.metrics.area
         return area
 
-    def _find_coastline_entrance(self, northeast, southeast, southwest, northwest) -> int:
+    @DeprecationWarning
+    def _find_coastline_entrance(self, northeast: Region, southeast: Region,
+                                 southwest: Region, northwest: Region) -> int:
         """Finds the direction of the coastline entrance,
         given that land is counter-clockwise to the coastline entrance"""
+        # There are instances where there are two possible coastline entrances
+        # This is hard to deal with
+        # I can, however, find a starting region and get the entrance from there
+        # It won't require the use of this method
         if northwest.terrain == constants.LAND and northeast.terrain == constants.WATER:
             return constants.NORTH
         elif northeast.terrain == constants.LAND and southeast.terrain == constants.WATER:
@@ -244,13 +250,22 @@ class World():
         elif southwest.terrain == constants.LAND and northwest.terrain == constants.WATER:
             return constants.WEST
 
-    def _find_coastline_exit(self, northeast, southeast, southwest, northwest) -> int:
+    def _find_coastline_exit(self, entrance: int, northeast: Region, southeast: Region,
+                             southwest: Region, northwest: Region) -> int:
         """Finds the direction of the coastline exit,
         given that land is counter-clockwise to the coastline entrance"""
+
         if northwest.terrain == constants.WATER and northeast.terrain == constants.LAND:
-            return constants.NORTH
+            if southwest.terrain == constants.LAND and southeast.terrain == constants.WATER:
+                # Handling a rare case where there are two possible exit directions
+                return constants.turn_direction(entrance)
+            else:
+                return constants.NORTH
         elif northeast.terrain == constants.WATER and southeast.terrain == constants.LAND:
-            return constants.EAST
+            if northwest.terrain == constants.LAND and southwest.terrain == constants.WATER:
+                return constants.turn_direction(entrance)
+            else:
+                return constants.EAST
         elif southeast.terrain == constants.WATER and southwest.terrain == constants.LAND:
             return constants.SOUTH
         elif southwest.terrain == constants.WATER and northwest.terrain == constants.LAND:
@@ -263,9 +278,9 @@ class World():
 
         if dir == constants.NORTHEAST:
             result[0] = self.get_region(x, y)
-            result[1] = self.get_next_region(x, y, constants.WEST)
+            result[1] = self.get_next_region(x, y, constants.SOUTH)
             result[2] = self.get_next_region(x, y, constants.SOUTHWEST)
-            result[3] = self.get_next_region(x, y, constants.SOUTH)
+            result[3] = self.get_next_region(x, y, constants.WEST)
         elif dir == constants.SOUTHEAST:
             result[0] = self.get_next_region(x, y, constants.NORTH)
             result[1] = self.get_region(x, y)
@@ -310,35 +325,42 @@ class World():
                 break
 
     def create_region_coastline(self, x: int, y: int) -> list[Region]:
-        """Generate a random coastline for the given a land region"""
+        """Generate a random coastline for the given a land region.
+        Returns a list of coastline regions.
+        If the coordinates points to an ocean region, returns None"""
+
+        # Works much better now, but I did get a None in coastline there...
+        # I wonder why
 
         coastline = []
 
         # If the user selected a landmass in the middle of a continent, I search outwards
         # Search north first. Algorithm will be less than efficient if coastline
-        # is nearby but not to the north, but it shouldn't be a big deal
-        for dir in range(1, 2, 8):
-            region = self._find_regions_in_direction(
-                x, y, dir, constants.NORTH, constants.WATER)
-
-            start_x = region.x
-            start_y = region.y
+        # is nearby but not to the north, but it's not a big deal
+        for dir in range(1, 8, 2):
+            region = self._find_region_in_direction(
+                x, y, dir, constants.WATER)
 
             if region is not None:
                 coastline.append(region)
                 # This will find ne, se, sw, nw regions surrounding a relevant coastline
-                surroundings = self._find_square_regions(region.x, region.y,
-                                                         constants.angle_direction(dir))
+                surroundings = self._find_square_regions(region.x, region.metrics.y,
+                                                         constants.angle_direction(dir, 5))
 
-                entrance = self._find_coastline_entrance(*surroundings)
+                entrance = constants.angle_direction(dir, 6)
+                exit = self._find_coastline_exit(entrance, *surroundings)
+                start_x = region.x
+                start_y = region.metrics.y
                 start_entrance = entrance
-                exit = self._find_coastline_exit(*surroundings)
+
                 # Let's do this later.
                 # First, draw something to verify I've got the correct coastline
                 # boundary = Boundary(entrance, exit, 5, 5,
                 #                     primary_terrain=constants.LAND,
                 #                     secondary_terrain=constants.WATER)
                 break
+        if region is None:
+            return None
 
         while True:
             entrance = constants.flip_direction(exit)
@@ -346,26 +368,30 @@ class World():
             # The coastline is searched in a clockwise direction,
             # meaning I can always get the correct entrance region from the exit direction
             if exit == constants.NORTH:
-                region = coastline[0]
+                # So previous exit NORTH means exit region is NORTHEAST
+                # NORTHEAST has index 0 in surroundings
+                # Flip exit region to get entrance region SOUTHEAST
+                region = surroundings[0]
                 surroundings = self._find_square_regions(
-                    region.x, region.y, constants.SOUTHEAST)
+                    region.x, region.metrics.y, constants.SOUTHEAST)
             elif exit == constants.EAST:
-                region = coastline[1]
+                region = surroundings[1]
                 surroundings = self._find_square_regions(
-                    region.x, region.y, constants.SOUTHWEST)
+                    region.x, region.metrics.y, constants.SOUTHWEST)
             elif exit == constants.SOUTH:
-                region = coastline[2]
+                region = surroundings[2]
                 surroundings = self._find_square_regions(
-                    region.x, region.y, constants.NORTHWEST)
+                    region.x, region.metrics.y, constants.NORTHWEST)
             elif exit == constants.WEST:
-                region = coastline[3]
+                region = surroundings[3]
                 surroundings = self._find_square_regions(
-                    region.x, region.y, constants.NORTHEAST)
+                    region.x, region.metrics.y, constants.NORTHEAST)
 
-            if region.x == start_x and region.y == start_y and entrance == start_entrance:
+            if region.x == start_x and region.metrics.y == start_y and entrance == start_entrance:
                 return coastline
             else:
-                exit = self._find_coastline_exit(*surroundings)
+                exit = self._find_coastline_exit(entrance, *surroundings)
+
                 coastline.append(region)
                 # Add to boundary
                 # boundary.add_segment(exit)

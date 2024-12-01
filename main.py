@@ -7,6 +7,7 @@ from continent_options import ContinentOptions
 from region import Region
 from plate import Plate
 import constants
+import random
 
 
 class Main(QtWidgets.QMainWindow):
@@ -227,11 +228,12 @@ class Main(QtWidgets.QMainWindow):
         """Paints all regions in the coastline with diagonal lines"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
-        pen.setColor(constants.GRID_COLOR)
+        pen.setColor(constants.PLATE_BORDER_COLOR)
         painter.setPen(pen)
 
         for region in coastline:
-            painter.drawLine(region.x * 20, region.y * 20, 20, 20)
+            painter.drawLine(region.x * 20, region.metrics.y * 20,
+                             region.x * 20 + 19, region.metrics.y * 20 + 19)
         painter.end()
         self.update()
 
@@ -250,9 +252,23 @@ class Main(QtWidgets.QMainWindow):
             self.paint_world()
             self.paint_grid()
             self.paint_lines()
+
+            # Try selecting a coastline
+            # I'll be adding a button for it later
+            # Use a limit to counter bugs
+            coastline = None
+            limit = 10
+            while coastline is None and limit > 0:
+                # Got to import random for this. Remove later
+                x = random.randrange(0, 72)
+                y = random.randrange(0, 36)
+                coastline = self.world.create_region_coastline(x, y)
+                limit -= 1
+            self.paint_coastline(coastline)
+
         elif self.precision == constants.REGION:
             self.paint_plates()
-            self.timer.singleShot(500, self.expand_plates)
+            self.timer.singleShot(100, self.expand_plates)
         elif self.precision == constants.SUBREGION:
             self.paint_plates()
             self.timer.singleShot(25, self.expand_plates)
