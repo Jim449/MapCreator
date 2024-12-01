@@ -1,6 +1,7 @@
 from region import Region
 from plate import Plate
 from region_metrics import RegionMetrics
+from boundary import Boundary
 import constants
 import math
 import random
@@ -77,6 +78,11 @@ class World():
 
     def get_region(self, x: int, y: int) -> Region:
         """Returns the region at (x,y)"""
+        return self.regions[y][x]
+
+    def get_next_region(self, x: int, y: int, dir: int) -> Region:
+        """Returns a region adjacent to (x,y)"""
+        nx, ny = constants.get_next_index(x, y, dir, self.length, self.height)
         return self.regions[y][x]
 
     def get_subregion(self, x: int, y: int) -> Region:
@@ -225,3 +231,142 @@ class World():
                 if region.terrain in (constants.WATER, constants.SHALLOWS, constants.SHALLOWS_2):
                     area += region.metrics.area
         return area
+
+    def _find_coastline_entrance(self, northeast, southeast, southwest, northwest) -> int:
+        """Finds the direction of the coastline entrance,
+        given that land is counter-clockwise to the coastline entrance"""
+        if northwest.terrain == constants.LAND and northeast.terrain == constants.WATER:
+            return constants.NORTH
+        elif northeast.terrain == constants.LAND and southeast.terrain == constants.WATER:
+            return constants.EAST
+        elif southeast.terrain == constants.LAND and southwest.terrain == constants.WATER:
+            return constants.SOUTH
+        elif southwest.terrain == constants.LAND and northwest.terrain == constants.WATER:
+            return constants.WEST
+
+    def _find_coastline_exit(self, northeast, southeast, southwest, northwest) -> int:
+        """Finds the direction of the coastline exit,
+        given that land is counter-clockwise to the coastline entrance"""
+        if northwest.terrain == constants.WATER and northeast.terrain == constants.LAND:
+            return constants.NORTH
+        elif northeast.terrain == constants.WATER and southeast.terrain == constants.LAND:
+            return constants.EAST
+        elif southeast.terrain == constants.WATER and southwest.terrain == constants.LAND:
+            return constants.SOUTH
+        elif southwest.terrain == constants.WATER and northwest.terrain == constants.LAND:
+            return constants.WEST
+
+    def _find_square_regions(self, x: int, y: int, dir: int) -> tuple[Region]:
+        """Returns a tuple of regions in order (NORTHEAST, SOUTHEAST, SOUTHWEST, NORTHWEST)
+        given the coordinates and relative placement of one of these regions"""
+        result = [None, None, None, None]
+
+        if dir == constants.NORTHEAST:
+            result[0] = self.get_region(x, y)
+            result[1] = self.get_next_region(x, y, constants.WEST)
+            result[2] = self.get_next_region(x, y, constants.SOUTHWEST)
+            result[3] = self.get_next_region(x, y, constants.SOUTH)
+        elif dir == constants.SOUTHEAST:
+            result[0] = self.get_next_region(x, y, constants.NORTH)
+            result[1] = self.get_region(x, y)
+            result[2] = self.get_next_region(x, y, constants.WEST)
+            result[3] = self.get_next_region(x, y, constants.NORTHWEST)
+        elif dir == constants.SOUTHWEST:
+            result[0] = self.get_next_region(x, y, constants.NORTHEAST)
+            result[1] = self.get_next_region(x, y, constants.EAST)
+            result[2] = self.get_region(x, y)
+            result[3] = self.get_next_region(x, y, constants.NORTH)
+        elif dir == constants.NORTHWEST:
+            result[0] = self.get_next_region(x, y, constants.EAST)
+            result[1] = self.get_next_region(x, y, constants.SOUTHEAST)
+            result[2] = self.get_next_region(x, y, constants.SOUTH)
+            result[3] = self.get_region(x, y)
+        return result
+
+    def _find_region_in_direction(self, x: int, y: int, dir: int,
+                                  terrain: int, limit: int = 72) -> Region:
+        """Finds the first region with the given terrain,
+        starting at (x,y) and moving in the given direction.
+        A search limit can be provided.
+        If the search succeeds, returns the
+        the last region not to have the given terrain.
+        If the search fails, returns None."""
+
+        region = self.get_region(x, y)
+
+        if region.terrain == terrain:
+            return None
+
+        while limit > 0:
+            x, y = constants.get_next_coordinates(x, y, dir)
+            previous_region = region
+            limit -= 1
+
+            if constants.within_bounds(x, y, self.length, self.height):
+                region = self.get_region(x, y)
+                if region.terrain == constants.WATER:
+                    return previous_region
+            else:
+                break
+
+    def create_region_coastline(self, x: int, y: int) -> list[Region]:
+        """Generate a random coastline for the given a land region"""
+
+        coastline = []
+
+        # If the user selected a landmass in the middle of a continent, I search outwards
+        # Search north first. Algorithm will be less than efficient if coastline
+        # is nearby but not to the north, but it shouldn't be a big deal
+        for dir in range(1, 2, 8):
+            region = self._find_regions_in_direction(
+                x, y, dir, constants.NORTH, constants.WATER)
+
+            start_x = region.x
+            start_y = region.y
+
+            if region is not None:
+                coastline.append(region)
+                # This will find ne, se, sw, nw regions surrounding a relevant coastline
+                surroundings = self._find_square_regions(region.x, region.y,
+                                                         constants.angle_direction(dir))
+
+                entrance = self._find_coastline_entrance(*surroundings)
+                start_entrance = entrance
+                exit = self._find_coastline_exit(*surroundings)
+                # Let's do this later.
+                # First, draw something to verify I've got the correct coastline
+                # boundary = Boundary(entrance, exit, 5, 5,
+                #                     primary_terrain=constants.LAND,
+                #                     secondary_terrain=constants.WATER)
+                break
+
+        while True:
+            entrance = constants.flip_direction(exit)
+            # Find next entrance region from coastline and exit direction
+            # The coastline is searched in a clockwise direction,
+            # meaning I can always get the correct entrance region from the exit direction
+            if exit == constants.NORTH:
+                region = coastline[0]
+                surroundings = self._find_square_regions(
+                    region.x, region.y, constants.SOUTHEAST)
+            elif exit == constants.EAST:
+                region = coastline[1]
+                surroundings = self._find_square_regions(
+                    region.x, region.y, constants.SOUTHWEST)
+            elif exit == constants.SOUTH:
+                region = coastline[2]
+                surroundings = self._find_square_regions(
+                    region.x, region.y, constants.NORTHWEST)
+            elif exit == constants.WEST:
+                region = coastline[3]
+                surroundings = self._find_square_regions(
+                    region.x, region.y, constants.NORTHEAST)
+
+            if region.x == start_x and region.y == start_y and entrance == start_entrance:
+                return coastline
+            else:
+                exit = self._find_coastline_exit(*surroundings)
+                coastline.append(region)
+                # Add to boundary
+                # boundary.add_segment(exit)
+                # But do that later, check if the coastline is correct first

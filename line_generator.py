@@ -10,14 +10,15 @@ class LineGenerator():
     the intersection between for cells (regions, subregions etc.)
     In other words, it's a cell offset by 0.5 length x and 0.5 height y."""
 
-    def __init__(self, x: int, y: int, length: int, height: int):
+    def __init__(self, x: int, y: int, length: int, height: int,
+                 entrance: int, exit: int):
         """Creates a line generator cell at x, y"""
         self.x = x
         self.y = y
         self.length = length
         self.height = height
-        self.entrance = 0
-        self.exit = 0
+        self.entrance = entrance
+        self.exit = exit
         self.start_x = -1
         self.start_y = -1
         self.prior_x = -1
@@ -177,6 +178,13 @@ class LineGenerator():
         self.backward_walk.clear()
         return self.forward_walk
 
+    def fill_untouched(self, terrain: int) -> None:
+        """Fills areas which hasn't yet been filled"""
+        for row in self.grid:
+            for column in range(self.length):
+                if row[column] == -1:
+                    row[column] = terrain
+
     def fill_terrain(self, x: int, y: int, terrain: int) -> None:
         """Fills an area with a terrain"""
         if self.within_boundaries(x, y) == False or self.grid[y][x] != -1:
@@ -188,8 +196,8 @@ class LineGenerator():
         self.fill_terrain(x, y + 1, terrain)
         self.fill_terrain(x - 1, y, terrain)
 
-    def set_terrain(self, primary_terrain: int, secondary_terrain: int,
-                    primary_clockwise_to_entry: bool) -> None:
+    def paint_terrain(self, primary_terrain: int, secondary_terrain: int,
+                      primary_clockwise_to_entry: bool = False, fill_remains: bool = True) -> None:
         for row in range(self.height + 2):
             self.grid.append([-1 for column in range(self.length + 2)])
 
@@ -211,38 +219,26 @@ class LineGenerator():
             self.fill_terrain(next_x, next_y, secondary_terrain)
             self.fill_terrain(last_x, last_y, primary_terrain)
 
-        # I need to fill any empty spaces formed due to tight walks
-        # However, it might be better to ban tight walks
-        # If I want to draw rivers, I certainly don't want them
-        # When building a path, check all directions, except for backward direction
-        # If there same path is there, I can't build
-        # If there opposite path is there, I can finish early
+        if fill_remains:
+            self.fill_untouched(primary_terrain)
 
 
 if __name__ == "__main__":
-    northeast = LineGenerator(1, 0, 5, 5)
-    northeast.set_entrance(constants.WEST)
-    northeast.set_exit(constants.SOUTH)
+    northeast = LineGenerator(1, 0, 5, 5, constants.WEST, constants.SOUTH)
     northeast.random_walk()
     northeast.set_terrain(1, 0, False)
 
-    southeast = LineGenerator(1, 1, 5, 5)
-    southeast.set_entrance(constants.NORTH)
-    southeast.set_exit(constants.WEST)
+    southeast = LineGenerator(1, 1, 5, 5, constants.NORTH, constants.WEST)
     southeast.inherit_start(northeast)
     southeast.random_walk()
     southeast.set_terrain(1, 0, False)
 
-    southwest = LineGenerator(0, 1, 5, 5)
-    southwest.set_entrance(constants.EAST)
-    southwest.set_exit(constants.NORTH)
+    southwest = LineGenerator(0, 1, 5, 5, constants.WEST, constants.NORTH)
     southwest.inherit_start(southeast)
     southwest.random_walk()
     southwest.set_terrain(1, 0, False)
 
-    northwest = LineGenerator(0, 0, 5, 5)
-    northwest.set_entrance(constants.SOUTH)
-    northwest.set_exit(constants.EAST)
+    northwest = LineGenerator(0, 0, 5, 5, constants.SOUTH, constants.EAST)
     northwest.inherit_start(southwest)
     northwest.inherit_end(northeast)
     northwest.random_walk()

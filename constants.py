@@ -43,7 +43,7 @@ def get_type_value(type: str) -> int:
 
 
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
-    """Returns new coordinates (x,y) after travelling once in a direction"""
+    """Returns new coordinates (x,y) after travelling once in a direction."""
     if dir == NORTH:
         return (x, y-1)
     elif dir == EAST:
@@ -56,9 +56,63 @@ def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
         return (x, y)
 
 
+def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[int]:
+    """Returns coordinates (x,y) after travelling once in an direction.
+    The result is a valid, positive index of a two-dimensional list"""
+    if dir == NORTH:
+        coordinates = (x, y-1)
+    elif dir == EAST:
+        coordinates = (x+1, y)
+    elif dir == SOUTH:
+        coordinates = (x, y+1)
+    elif dir == WEST:
+        coordinates = (x-1, y)
+    elif dir == NORTHEAST:
+        coordinates = (x+1, y-1)
+    elif dir == SOUTHEAST:
+        coordinates = (x+1, y+1)
+    elif dir == SOUTHWEST:
+        coordinates = (x-1, y+1)
+    elif dir == NORTHWEST:
+        coordinates = (x-1, y-1)
+    else:
+        return (x, y)
+
+    coordinates[0] = coordinates[0] % length
+
+    if coordinates[1] >= height:
+        coordinates[1] = height
+    elif coordinates[1] < 0:
+        coordinates[1] = 0
+
+    return coordinates
+
+
+def within_bounds(x: int, y: int, length: int, height: int) -> bool:
+    """Returns true if (x,y) are valid, positive coordinates
+    of a two-dimensional list"""
+    return (0 <= x < length) and (0 <= y < height)
+
+
 def flip_direction(dir: int) -> int:
     """Returns the opposite direction"""
     dir += 4
     if dir > 8:
+        dir -= 8
+    return dir
+
+
+def turn_direction(dir: int) -> int:
+    """Returns the direction with an angle of -90 degrees to the given direction"""
+    dir += 2
+    if dir > 8:
+        dir -= 8
+    return dir
+
+
+def angle_direction(dir: int) -> int:
+    """Returns the direction with an angle of -45 degrees to the given direction"""
+    dir += 1
+    if dir > 0:
         dir -= 8
     return dir

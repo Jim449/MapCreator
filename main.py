@@ -38,6 +38,7 @@ class Main(QtWidgets.QMainWindow):
         self.show_plate_borders: bool = True
         self.show_coordinate_lines: bool = True
         self.selected_plate: Plate = None
+        self.selected_region: Region = None
 
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(5)
@@ -222,6 +223,18 @@ class Main(QtWidgets.QMainWindow):
         painter.end()
         self.update()
 
+    def paint_coastline(self, coastline: list[Region]):
+        """Paints all regions in the coastline with diagonal lines"""
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setColor(constants.GRID_COLOR)
+        painter.setPen(pen)
+
+        for region in coastline:
+            painter.drawLine(region.x * 20, region.y * 20, 20, 20)
+        painter.end()
+        self.update()
+
     def expand_plates(self):
         """Expands plates by one growth step and paints the progress.
         When finished, generates continents and paints the map"""
@@ -329,6 +342,16 @@ class Main(QtWidgets.QMainWindow):
                 region.terrain = constants.LAND
         self.view_continents()
 
+    def select_coastline(self):
+        """Selects a coastline"""
+        # Create region coastline will be updated to create a new coastline
+        # I may want to just select the coastline first
+        # Then, the user can randomize it any number of times
+        # and I won't have to redo the coastline search
+        coastline = self.world.create_region_coastline(
+            self.selected_region.x, self.selected_region.y)
+        self.paint_coastline(coastline)
+
     def view_plates(self):
         """Paints the plates"""
         self.paint_plates()
@@ -362,7 +385,7 @@ Sea percentage: {sea_area / self.world.area:.0%}
             header = "Region"
             column = x // 20
             row = y // 20
-            region = self.world.get_region(column, row)
+            self.selected_region = self.world.get_region(column, row)
 
             try:
                 self.selected_plate = self.world.get_plate(
@@ -372,9 +395,10 @@ Sea percentage: {sea_area / self.world.area:.0%}
                 self.continent_options.plate_margin.setValue(
                     self.selected_plate.margin)
                 self.info_label.setText(
-                    f"{header}\n{region.get_info()}\n\n{self.selected_plate.get_info()}")
+                    f"{header}\n{self.selected_region.get_info()}\n\n{self.selected_plate.get_info()}")
             except IndexError:
-                self.info_label.setText(f"{header}\n{region.get_info()}")
+                self.info_label.setText(
+                    f"{header}\n{self.selected_region.get_info()}")
 
         return super().eventFilter(object, event)
 
