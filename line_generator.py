@@ -31,11 +31,11 @@ class LineGenerator():
         self.backward_walk: list[tuple[int]] = []
         self.grid: list[list[int]] = []
 
-    def within_center(self, x: int, y: int) -> bool:
+    def _within_center(self, x: int, y: int) -> bool:
         """Checks if a coordinate is in the grid, inside the frame"""
         return (1 <= x < self.length + 1) and (1 <= y < self.height + 1)
 
-    def within_boundaries(self, x: int, y: int) -> bool:
+    def _within_boundaries(self, x: int, y: int) -> bool:
         """Checks if a coordinate is contained within the grid"""
         return (0 <= x < self.length + 2) and (0 <= y < self.height + 2)
 
@@ -201,7 +201,7 @@ class LineGenerator():
                 del opposite_walk[opposite_walk.index(next):]
                 return True
 
-            elif self.within_center(next[0], next[1]):
+            elif self._within_center(next[0], next[1]):
                 if self._margin_check(next, walk, margin, dir):
                     walk.append(next)
                     return False
@@ -236,16 +236,16 @@ class LineGenerator():
         self.backward_walk.clear()
         return self.forward_walk
 
-    def fill_untouched(self, terrain: int) -> None:
+    def _fill_untouched(self, terrain: int) -> None:
         """Fills areas which hasn't yet been filled"""
         for row in self.grid:
             for column in range(self.length):
                 if row[column] == -1:
                     row[column] = terrain
 
-    def fill_terrain(self, x: int, y: int, terrain: int) -> None:
+    def _fill_terrain(self, x: int, y: int, terrain: int) -> None:
         """Fills an area with a terrain"""
-        if self.within_boundaries(x, y) == False or self.grid[y][x] != -1:
+        if self._within_boundaries(x, y) == False or self.grid[y][x] != -1:
             return
 
         self.grid[y][x] = terrain
@@ -253,6 +253,15 @@ class LineGenerator():
         self.fill_terrain(x + 1, y, terrain)
         self.fill_terrain(x, y + 1, terrain)
         self.fill_terrain(x - 1, y, terrain)
+
+    def _strip_grid(self):
+        """Removes the outer elements of the grid"""
+        self.grid.pop()
+        self.grid.pop(0)
+
+        for row in self.grid:
+            row.pop()
+            row.pop(0)
 
     def paint_terrain(self, line_terrain: int,
                       primary_terrain: int = -1,
@@ -290,18 +299,20 @@ class LineGenerator():
 
         if primary_terrain != -1:
             if primary_clockwise_to_entry:
-                self.fill_terrain(next_x, next_y, primary_terrain)
+                self._fill_terrain(next_x, next_y, primary_terrain)
             else:
-                self.fill_terrain(last_x, last_y, primary_terrain)
+                self._fill_terrain(last_x, last_y, primary_terrain)
 
         if secondary_terrain != -1:
             if primary_clockwise_to_entry:
-                self.fill_terrain(last_x, last_y, secondary_terrain)
+                self._fill_terrain(last_x, last_y, secondary_terrain)
             else:
-                self.fill_terrain(next_x, next_y, secondary_terrain)
+                self._fill_terrain(next_x, next_y, secondary_terrain)
 
         if primary_terrain != -1 and fill_remains:
-            self.fill_untouched(primary_terrain)
+            self._fill_untouched(primary_terrain)
+
+        self._strip_grid()
 
     def clear(self) -> None:
         """Removes generated terrain while retaining position in boundary"""
@@ -316,6 +327,15 @@ class LineGenerator():
         self.forward_walk.clear()
         self.backward_walk.clear()
         self.grid.clear()
+
+    def get_terrain_grid(self) -> list[list[int]]:
+        """Returns the terrain grid"""
+        return self.grid
+
+    def get_grid_offset(self) -> tuple[int, int]:
+        """Returns the in-world coordinate (x, y)
+        pointed at by the grid element at (0, 0)"""
+        return (self.x, self.y)
 
 
 if __name__ == "__main__":

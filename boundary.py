@@ -54,25 +54,32 @@ class Boundary():
         else:
             self.line_terrain = line_terrain
 
-        line_generator = LineGenerator(0, 0, length, height, entrance, exit)
+        line_generator = LineGenerator(
+            start_x, start_y, length, height, entrance, exit)
         self.path.append(line_generator)
 
     def add_segment(self, exit: int) -> None:
         """Adds a new segment to the path, with an exit in the given direction"""
         previous = self.path[-1]
 
-        x, y = constants.get_next_coordinates(
-            previous.x, previous.y, previous.exit)
+        change = constants.get_next_coordinates(0, 0, previous.exit)
+        x = previous.x + change[0] * self.length
+        y = previous.y + change[1] * self.height
+
         line_generator = LineGenerator(x, y, self.length, self.height,
                                        constants.flip_direction(previous.exit), exit)
         self.path.append(line_generator)
 
-    def clear_path(self):
+    def clear_path(self) -> None:
         """Clears the generated path and retain, retaining the general stretch of the path"""
         for segment in self.path:
             segment.clear()
 
-    def generate(self):
+    def get_path(self) -> list[LineGenerator]:
+        """Returns the boundary path, containing generated terrain for each cell"""
+        return self.path
+
+    def generate(self) -> None:
         """Generates paths and terrain for this boundary"""
         segment = self.path[0]
         segment.random_walk(self.line_margin, self.forbid_full_turn)
