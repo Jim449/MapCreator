@@ -120,9 +120,49 @@ class LineGenerator():
         self.end_x, self.end_y = constants.get_next_coordinates(
             self.post_x, self.post_y, originator.entrance)
 
-    def _next_step(self, walk: list[tuple[int]], opposite_walk: list[tuple[int]]) -> bool:
-        """Adds a new position to a walk, so that the walk stays within the given bounds
-        and doesn't create loops. If no valid positions are found, both walk and opposite walk
+    def _margin_check(self, step: tuple[int], walk: list[tuple[int]],
+                      margin: int, direction: int) -> bool:
+        """Return true if the given step has sufficient margins
+        to previous steps within the same walk.
+        Provide direction of travel from the previous step"""
+        if margin == 0:
+            return True
+        elif margin == 1:
+            return step not in walk
+        elif margin == 2:
+            backwards = constants.flip_direction(direction)
+
+            for dir in range(1, 8, 2):
+                if dir == backwards:
+                    continue
+                coordinates = constants.get_next_coordinates(
+                    step[0], step[1], dir)
+
+                if coordinates in walk:
+                    return False
+            return True
+
+    def _completion_check(self, walk: list[tuple[int]], opposite: list[tuple[int]],
+                          directions: list[int]) -> bool:
+        """Checks if a walk can reach the opposite walk within a single step.
+        Adds that step to the walk and returns true.
+        If opposite walk is unreachable, returns false"""
+        last = walk[-1]
+
+        for dir in directions:
+            coordinates = constants.get_next_coordinates(last[0], last[1], dir)
+
+            if coordinates in opposite:
+                walk.append(coordinates)
+                return True
+        return False
+
+    def _next_step(self, walk: list[tuple[int]],
+                   opposite_walk: list[tuple[int]],
+                   margin: int, forbid_turn: bool,
+                   banned_direction: int) -> bool:
+        """Adds a new position to a walk, so that the walk stays within the given bounds.
+        If no valid positions are found, both walk and opposite walk
         are cleared, except for their starting points. If walk reaches opposite walk,
         positions are removed from opposite walk until both walks can be joined to form
         a single path.
@@ -130,6 +170,9 @@ class LineGenerator():
         Args:
             walk: list of x,y-coordinates
             opposite_walk: list of x,y-coordinates
+            margin: walks minimum distance to self. 0: loops allowed. 1: loops forbidden. 2: no enclosed areas
+            forbid_turn: ban walks moving directly away from exit direction
+            banned_direction: direction banned by forbid_turn
         Returns:
             True if walk is completed and the two paths can be joined.
             False if walk was either successfully expanded upon or erased 
@@ -137,6 +180,16 @@ class LineGenerator():
         x, y = walk[-1]
         options = [constants.NORTH, constants.EAST,
                    constants.SOUTH, constants.WEST]
+
+        if forbid_turn:
+            options.remove(banned_direction)
+
+        # For margin of 2, walk can only approach the opposite walk
+        # for the purpose of completing the walk
+        if margin == 2 and self._completion_check(walk, opposite_walk, options):
+            last = walk[-1]
+            del opposite_walk[opposite_walk.index(last):]
+            return True
 
         while len(options) > 0:
             dir = random.choice(options)
@@ -147,14 +200,17 @@ class LineGenerator():
                 walk.append(next)
                 del opposite_walk[opposite_walk.index(next):]
                 return True
-            elif self.within_center(next[0], next[1]) and next not in walk:
-                walk.append(next)
-                return False
+
+            elif self.within_center(next[0], next[1]):
+                if self._margin_check(next, walk, margin, dir):
+                    walk.append(next)
+                    return False
+
         del walk[2:]
         del opposite_walk[2:]
         return False
 
-    def random_walk(self) -> list[tuple]:
+    def random_walk(self, margin: int = 1, forbid_turn: bool = False) -> list[tuple]:
         """Generates a random path from start to end coordinates.
         The path will be free of loops"""
         if self.start_x == -1:
@@ -168,9 +224,11 @@ class LineGenerator():
                               (self.end_x, self.end_y)]
 
         while True:
-            if self._next_step(self.forward_walk, self.backward_walk):
+            if self._next_step(self.forward_walk, self.backward_walk, margin,
+                               forbid_turn, constants.flip_direction(self.exit)):
                 break
-            if self._next_step(self.backward_walk, self.forward_walk):
+            if self._next_step(self.backward_walk, self.forward_walk, margin,
+                               forbid_turn, self.exit):
                 break
 
         self.backward_walk.reverse()
@@ -196,13 +254,31 @@ class LineGenerator():
         self.fill_terrain(x, y + 1, terrain)
         self.fill_terrain(x - 1, y, terrain)
 
-    def paint_terrain(self, primary_terrain: int, secondary_terrain: int,
-                      primary_clockwise_to_entry: bool = False, fill_remains: bool = True) -> None:
+    def paint_terrain(self, line_terrain: int,
+                      primary_terrain: int = -1,
+                      secondary_terrain: int = -1,
+                      primary_clockwise_to_entry: bool = False,
+                      fill_remains: bool = True) -> None:
+        """Paints the terrain.
+
+        Args:
+            line_terrain:
+                terrain for painting the path
+            primary_terrain:
+                terrain for painting the area enclosed by the boundary or -1 for no paint
+            secondary_terrain:
+                terrain for painting the area outside the boundary or -1 for no paint
+            primary_clockwise_to_entry:
+                position of primary terrain relative to entrance direction.
+                Typically, the enclosed area is clockwise, making this counter clockwise
+            fill_remains:
+                if true, fills unpainted areas with primary terrain.
+                Handles areas the fill algorithm missed"""
         for row in range(self.height + 2):
             self.grid.append([-1 for column in range(self.length + 2)])
 
         for x, y in self.forward_walk:
-            self.grid[y][x] = primary_terrain
+            self.grid[y][x] = line_terrain
 
         next_dir = (self.entrance + 2) % 8
         final_dir = (self.exit + 2) % 8
@@ -212,15 +288,34 @@ class LineGenerator():
         last_x, last_y = constants.get_next_coordinates(
             self.post_x, self.post_y, final_dir)
 
-        if primary_clockwise_to_entry:
-            self.fill_terrain(next_x, next_y, primary_terrain)
-            self.fill_terrain(last_x, last_y, secondary_terrain)
-        else:
-            self.fill_terrain(next_x, next_y, secondary_terrain)
-            self.fill_terrain(last_x, last_y, primary_terrain)
+        if primary_terrain != -1:
+            if primary_clockwise_to_entry:
+                self.fill_terrain(next_x, next_y, primary_terrain)
+            else:
+                self.fill_terrain(last_x, last_y, primary_terrain)
 
-        if fill_remains:
+        if secondary_terrain != -1:
+            if primary_clockwise_to_entry:
+                self.fill_terrain(last_x, last_y, secondary_terrain)
+            else:
+                self.fill_terrain(next_x, next_y, secondary_terrain)
+
+        if primary_terrain != -1 and fill_remains:
             self.fill_untouched(primary_terrain)
+
+    def clear(self) -> None:
+        """Removes generated terrain while retaining position in boundary"""
+        self.start_x = -1
+        self.start_y = -1
+        self.prior_x = -1
+        self.prior_y = -1
+        self.end_x = -1
+        self.end_y = -1
+        self.post_x = -1
+        self.post_y = -1
+        self.forward_walk.clear()
+        self.backward_walk.clear()
+        self.grid.clear()
 
 
 if __name__ == "__main__":

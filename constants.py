@@ -44,6 +44,16 @@ def get_type_value(type: str) -> int:
     return type_values[type.lower()]
 
 
+def is_type(type: int, cathegory: int):
+    """Returns true if type belongs to the given cathegory"""
+    if type == cathegory:
+        return True
+    elif cathegory == LAND:
+        return type in (MOUNTAIN)
+    elif cathegory == WATER:
+        return type in (SHALLOWS)
+
+
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
     """Returns new coordinates (x,y) after travelling once in a direction."""
     if dir == NORTH:

@@ -30,12 +30,23 @@ class Main(QtWidgets.QMainWindow):
                     QColor(255, 193, 7), QColor(255, 213, 79),
                     QColor(255, 87, 34), QColor(255, 138, 101)]
 
+    # If one region contains 5 subregions, region size is 20,
+    # region length is 72 and region height is 36
+    # That's good but I'd like an even number (makes it easier when creating boundaries)
+    # If one region contains 6 subregions, region size is 24
+    # region length is 60 and region height is 30
+    # Let's try it
+    REGION_SIZE: int = 24
+    REGION_LENGTH: int = 60
+    REGION_HEIGHT: int = 30
+
     def __init__(self):
         super().__init__()
 
         self.precision = constants.SUBREGION
         self.timer = QTimer()
-        self.world = World(radius=6372, length=72, height=36)
+        self.world = World(
+            radius=6372, length=Main.REGION_LENGTH, height=Main.REGION_HEIGHT)
         self.show_plate_borders: bool = True
         self.show_coordinate_lines: bool = True
         self.selected_plate: Plate = None
@@ -63,18 +74,6 @@ class Main(QtWidgets.QMainWindow):
 
         self.screen = QtWidgets.QLabel(parent=self)
         self.screen.installEventFilter(self)
-        # World map has 72x36 regions and 360x180 subregions
-        # Multiply the latter by 4 to get a decent display size
-
-        # I should have a zoomed in map as well
-        # Maximum region size is 556x556 km
-        # I can afford 1px per km
-        # That should suffice
-
-        # Use a medium zoom map too
-        # I may want to display subregions at 20x20px
-        # Then a region will be 100x100px
-        # I can fit 14x7 regions
 
         self.world_map = QtGui.QPixmap(1440, 720)
         self.world_map.fill(constants.get_color(constants.WATER))
@@ -217,8 +216,8 @@ class Main(QtWidgets.QMainWindow):
         pen.setColor(constants.GRID_COLOR)
         painter.setPen(pen)
 
-        for x in range(0, 1440, 20):
-            for y in range(0, 720, 20):
+        for x in range(0, 1440, Main.REGION_SIZE):
+            for y in range(0, 720, Main.REGION_SIZE):
                 painter.drawLine(x, 0, x, 720)
                 painter.drawLine(0, y, 1440, y)
         painter.end()
@@ -232,8 +231,14 @@ class Main(QtWidgets.QMainWindow):
         painter.setPen(pen)
 
         for region in coastline:
-            painter.drawLine(region.x * 20, region.metrics.y * 20,
-                             region.x * 20 + 19, region.metrics.y * 20 + 19)
+            painter.drawLine(region.x * Main.REGION_SIZE,
+                             region.metrics.y * Main.REGION_SIZE,
+                             (region.x + 1) * Main.REGION_SIZE - 1,
+                             (region.metrics.y + 1) * Main.REGION_SIZE - 1)
+            painter.drawLine((region.x + 1) * Main.REGION_SIZE - 1,
+                             region.metrics.y * Main.REGION_SIZE,
+                             region.x * Main.REGION_SIZE,
+                             (region.metrics.y + 1) * Main.REGION_SIZE - 1)
         painter.end()
         self.update()
 
@@ -260,8 +265,8 @@ class Main(QtWidgets.QMainWindow):
             limit = 10
             while coastline is None and limit > 0:
                 # Got to import random for this. Remove later
-                x = random.randrange(0, 72)
-                y = random.randrange(0, 36)
+                x = random.randrange(0, Main.REGION_LENGTH)
+                y = random.randrange(0, Main.REGION_HEIGHT)
                 coastline = self.world.create_region_coastline(x, y)
                 limit -= 1
             self.paint_coastline(coastline)
@@ -399,8 +404,8 @@ Sea percentage: {sea_area / self.world.area:.0%}
             y = event.y()
 
             header = "Region"
-            column = x // 20
-            row = y // 20
+            column = x // Main.REGION_SIZE
+            row = y // Main.REGION_SIZE
             self.selected_region = self.world.get_region(column, row)
 
             try:

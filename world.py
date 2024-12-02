@@ -27,12 +27,15 @@ class World():
         self.height = height
         self.sub_length = sub_length
         self.sub_height = sub_height
+        self.region_size = 360 // length
 
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
 
         self.fixed_growth = True
+
+        self.boundary: Boundary = None
 
         for y in range(height):
             metrics = self._get_region_metric(
@@ -91,7 +94,7 @@ class World():
 
     def get_subregion_of_region(self, x: int, y: int, region_x: int, region_y: int) -> Region:
         """Returns the subregion at (x, y) within region at (region_x, region_y)"""
-        return self.subregions[region_y * 5 + y][region_x * 5 + x]
+        return self.subregions[region_y * self.region_size + y][region_x * self.region_size + x]
 
     def create_plates(self, land_amount: int, water_amount: int, odd_amount: int,
                       margin: float, island_rate: float,
@@ -174,8 +177,8 @@ class World():
         """Sets subregion variables based on region variables"""
         for y in range(self.sub_height):
             for x in range(self.sub_length):
-                ry = y // 5
-                region = self.get_region(x // 5, ry)
+                ry = y // self.region_size
+                region = self.get_region(x // self.region_size, ry)
                 subregion = self.get_subregion(x, y)
                 subregion.plate = region.plate
                 subregion.terrain = region.terrain
@@ -299,7 +302,7 @@ class World():
         return result
 
     def _find_region_in_direction(self, x: int, y: int, dir: int,
-                                  terrain: int, limit: int = 72) -> Region:
+                                  terrain: int, limit: int = 60) -> Region:
         """Finds the first region with the given terrain,
         starting at (x,y) and moving in the given direction.
         A search limit can be provided.
@@ -331,6 +334,8 @@ class World():
 
         # Works much better now, but I did get a None in coastline there...
         # I wonder why
+        # Got an infinite loop there. Something broke after changing region size to 6?
+        # No, I have other errors
 
         coastline = []
 
@@ -353,11 +358,23 @@ class World():
                 start_y = region.metrics.y
                 start_entrance = entrance
 
-                # Let's do this later.
-                # First, draw something to verify I've got the correct coastline
-                # boundary = Boundary(entrance, exit, 5, 5,
-                #                     primary_terrain=constants.LAND,
-                #                     secondary_terrain=constants.WATER)
+                # The boundary is as large as a region,
+                # located in the middle of the surroundings
+                # Use the northwest region to calculate starting coordinates
+                boundary_x = surroundings[3].x * \
+                    self.region_size + self.region_size // 2
+                boundary_y = surroundings[3].metrics.y * \
+                    self.region_size + self.region_size // 2
+
+                self.boundary = Boundary(entrance=entrance,
+                                         exit=exit,
+                                         length=self.region_size,
+                                         height=self.region_size,
+                                         start_x=boundary_x,
+                                         start_y=boundary_y,
+                                         line_terrain=constants.LAND,
+                                         primary_terrain=constants.LAND,
+                                         secondary_terrain=constants.WATER)
                 break
         if region is None:
             return None
@@ -393,6 +410,4 @@ class World():
                 exit = self._find_coastline_exit(entrance, *surroundings)
 
                 coastline.append(region)
-                # Add to boundary
-                # boundary.add_segment(exit)
-                # But do that later, check if the coastline is correct first
+                self.boundary.add_segment(exit)
