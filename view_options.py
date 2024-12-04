@@ -1,0 +1,27 @@
+from PyQt5.QtCore import Qt
+from PyQt5 import QtWidgets
+
+
+class ViewOptions():
+    """Options for changing map display"""
+
+    def __init__(self, main):
+        """Creates new view options with a vertical box layout"""
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.setSpacing(5)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+
+        self.view_grid = QtWidgets.QCheckBox(text="View grid")
+        self.view_grid.stateChanged.connect(main.view_continents)
+        self.layout.addWidget(self.view_grid)
+
+        self.view_lines = QtWidgets.QCheckBox(text="View key lines")
+        self.view_lines.stateChanged.connect(main.view_continents)
+        self.layout.addWidget(self.view_lines)
+
+        self.view_plate_borders = QtWidgets.QCheckBox(
+            text="View plate borders")
+        self.view_plate_borders.stateChanged.connect(main.view_continents)
+        self.layout.addWidget(self.view_plate_borders)
+
+        self.layout.addStretch()

@@ -4,6 +4,9 @@ from PyQt5.QtGui import QColor
 from world import World
 from plate_options import PlateOptions
 from continent_options import ContinentOptions
+from boundary_options import BoundaryOptions
+from view_options import ViewOptions
+from toolbar import Toolbar
 from region import Region
 from plate import Plate
 import constants
@@ -56,57 +59,71 @@ class Main(QtWidgets.QMainWindow):
         self.layout.setSpacing(5)
         self.layout.setContentsMargins(5, 5, 5, 5)
 
+        # Info panel to the left
         self.info_layout = QtWidgets.QVBoxLayout()
         self.info_layout.setSpacing(5)
         self.info_layout.setContentsMargins(5, 5, 5, 5)
+        self.info_label = QtWidgets.QLabel()
+        self.info_layout.addWidget(self.info_label)
+        self.info_layout.addStretch()
 
+        # Map in the center
         self.map_layout = QtWidgets.QVBoxLayout()
         self.map_layout.setSpacing(5)
         self.map_layout.setContentsMargins(5, 5, 5, 5)
 
-        self.plate_option_layout = QtWidgets.QVBoxLayout()
-        self.plate_option_layout.setSpacing(5)
-        self.plate_option_layout.setContentsMargins(5, 5, 5, 5)
-
-        self.layout.addLayout(self.info_layout)
-        self.layout.addLayout(self.map_layout)
-        self.layout.addLayout(self.plate_option_layout)
-
         self.screen = QtWidgets.QLabel(parent=self)
         self.screen.installEventFilter(self)
-
         self.world_map = QtGui.QPixmap(1440, 720)
         self.world_map.fill(constants.get_color(constants.WATER))
         self.screen.setPixmap(self.world_map)
         self.map_layout.addWidget(self.screen)
 
-        self.info_label = QtWidgets.QLabel("", self)
-        self.info_layout.addWidget(self.info_label)
+        # Options under the map
+        self.options_layout = QtWidgets.QHBoxLayout()
+        self.map_layout.addLayout(self.options_layout)
 
-        self.plate_view_button = QtWidgets.QPushButton(
-            text="Show plates", parent=self)
-        self.plate_view_button.clicked.connect(self.view_plates)
-        self.map_layout.addWidget(self.plate_view_button)
+        self.toolbar = Toolbar(self)
+        self.view_options = ViewOptions(self)
 
-        self.continent_view_button = QtWidgets.QPushButton(
-            text="Show continents", parent=self)
-        self.continent_view_button.clicked.connect(self.view_continents)
-        self.map_layout.addWidget(self.continent_view_button)
+        self.options_layout.addLayout(self.toolbar.layout)
+        self.options_layout.addLayout(self.view_options.layout)
 
-        self.world_info_button = QtWidgets.QPushButton(
-            text="Show world info", parent=self)
-        self.world_info_button.clicked.connect(self.view_world_info)
-        self.map_layout.addWidget(self.world_info_button)
-        self.map_layout.addStretch()
+        # Add everything
+        self.layout.addLayout(self.info_layout)
+        self.layout.addLayout(self.map_layout)
 
-        self.plate_options = PlateOptions(self, self.plate_option_layout)
-        self.continent_options = ContinentOptions(self, self.info_layout)
+        # Right panel - show a single panel, starting with plate generation
+        self.plate_options = PlateOptions(self)
+        self.continent_options = ContinentOptions(self)
+        self.boundary_options = BoundaryOptions(self)
 
+        self.layout.addWidget(self.plate_options.frame)
+        self.current_tool = self.plate_options
+
+        # Central widget to get things going
         widget = QtWidgets.QWidget()
         widget.setLayout(self.layout)
         self.setCentralWidget(widget)
 
         self.view_world_info()
+
+        # Old stuff
+        # self.plate_view_button = QtWidgets.QPushButton(
+        #     text="Show plates", parent=self)
+        # self.plate_view_button.clicked.connect(self.view_plates)
+        # self.map_layout.addWidget(self.plate_view_button)
+
+        # self.continent_view_button = QtWidgets.QPushButton(
+        #     text="Show continents", parent=self)
+        # self.continent_view_button.clicked.connect(self.view_continents)
+        # self.map_layout.addWidget(self.continent_view_button)
+
+        # self.world_info_button = QtWidgets.QPushButton(
+        #     text="Show world info", parent=self)
+        # self.world_info_button.clicked.connect(self.view_world_info)
+        # self.map_layout.addWidget(self.world_info_button)
+        # self.map_layout.addStretch()
 
     def paint_plates(self):
         """Paints tectonic plates. Unclaimed regions are painted black"""
@@ -152,7 +169,7 @@ class Main(QtWidgets.QMainWindow):
         except IndexError:
             return False
 
-    def paint_world(self):
+    def paint_world(self, paint_plate_borders: bool = True):
         """Paints regions or subregions"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
@@ -180,12 +197,14 @@ class Main(QtWidgets.QMainWindow):
                 painter.setPen(pen)
                 painter.drawPoint(point//2 + x*point, point//2 + y*point)
 
-                if self.has_plate_border(map, region, x, y, constants.EAST):
+                if paint_plate_borders and self.has_plate_border(
+                        map, region, x, y, constants.EAST):
                     painter.setPen(outliner)
                     painter.drawLine((x+1)*point - 1, y*point - 1,
                                      (x+1)*point - 1, (y+1)*point - 1)
 
-                if self.has_plate_border(map, region, x, y, constants.SOUTH):
+                if paint_plate_borders and self.has_plate_border(
+                        map, region, x, y, constants.SOUTH):
                     painter.setPen(outliner)
                     painter.drawLine(x*point - 1, (y+1)*point - 1,
                                      (x+1)*point - 1, (y+1)*point - 1)
@@ -254,22 +273,21 @@ class Main(QtWidgets.QMainWindow):
                 self.world.update_regions_from_subregions()
 
             self.world.find_plate_boundaries()
-            self.paint_world()
-            self.paint_grid()
-            self.paint_lines()
+            self.view_world_info()
+            self.view_continents()
 
             # Try selecting a coastline
             # I'll be adding a button for it later
             # Use a limit to counter bugs
-            coastline = None
-            limit = 10
-            while coastline is None and limit > 0:
-                # Got to import random for this. Remove later
-                x = random.randrange(0, Main.REGION_LENGTH)
-                y = random.randrange(0, Main.REGION_HEIGHT)
-                coastline = self.world.create_region_coastline(x, y)
-                limit -= 1
-            self.paint_coastline(coastline)
+            # coastline = None
+            # limit = 10
+            # while coastline is None and limit > 0:
+            #     # Got to import random for this. Remove later
+            #     x = random.randrange(0, Main.REGION_LENGTH)
+            #     y = random.randrange(0, Main.REGION_HEIGHT)
+            #     coastline = self.world.create_region_coastline(x, y)
+            #     limit -= 1
+            # self.paint_coastline(coastline)
 
         elif self.precision == constants.REGION:
             self.paint_plates()
@@ -282,6 +300,7 @@ class Main(QtWidgets.QMainWindow):
         """Generates tectonic plates and creats continents"""
 
         self.plate_options.generate_button.setEnabled(False)
+        self.toolbar.plate_generation_tool.setEnabled(False)
 
         if self.plate_options.high_resolution.isChecked():
             self.precision = constants.SUBREGION
@@ -373,16 +392,25 @@ class Main(QtWidgets.QMainWindow):
             self.selected_region.x, self.selected_region.y)
         self.paint_coastline(coastline)
 
+    def generate_coastline(self):
+        """Randomizes the selected coastline"""
+        self.world.generate_region_coastline()
+
     def view_plates(self):
         """Paints the plates"""
         self.paint_plates()
-        self.paint_lines()
+        if self.view_options.view_grid.isChecked():
+            self.paint_grid()
+        if self.view_options.view_lines.isChecked():
+            self.paint_lines()
 
     def view_continents(self):
         """Paints the world map"""
-        self.paint_world()
-        self.paint_grid()
-        self.paint_lines()
+        self.paint_world(self.view_options.view_plate_borders.isChecked())
+        if self.view_options.view_grid.isChecked():
+            self.paint_grid()
+        if self.view_options.view_lines.isChecked():
+            self.paint_lines()
 
     def view_world_info(self):
         """Shows world information"""

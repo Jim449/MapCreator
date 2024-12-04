@@ -332,6 +332,10 @@ class LineGenerator():
         """Returns the terrain grid"""
         return self.grid
 
+    def get_terrain(self, x: int, y: int) -> int:
+        """Gets the terrain at (x, y)"""
+        return self.grid[y][x]
+
     def get_grid_offset(self) -> tuple[int, int]:
         """Returns the in-world coordinate (x, y)
         pointed at by the grid element at (0, 0)"""

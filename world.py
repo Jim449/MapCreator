@@ -2,6 +2,7 @@ from region import Region
 from plate import Plate
 from region_metrics import RegionMetrics
 from boundary import Boundary
+from line_generator import LineGenerator
 import constants
 import math
 import random
@@ -411,3 +412,23 @@ class World():
 
                 coastline.append(region)
                 self.boundary.add_segment(exit)
+
+    def apply_line_on_region(self, line: LineGenerator):
+        """Generates terrain using a line generator"""
+        start_x, start_y = line.get_grid_offset()
+
+        for x in line.length:
+            for y in line.height:
+                subregion = self.get_subregion(start_x + x, start_y + y)
+                terrain = line.get_terrain(x, y)
+
+                if not constants.is_type(subregion.type, terrain):
+                    subregion.terrain = terrain
+
+    def generate_region_coastline(self):
+        """Generates terrain using the saved boundary"""
+        if self.boundary is not None:
+            self.boundary.generate()
+
+        for line in self.boundary.get_path():
+            self.apply_line_on_region(line)
