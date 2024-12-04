@@ -97,6 +97,18 @@ class World():
         """Returns the subregion at (x, y) within region at (region_x, region_y)"""
         return self.subregions[region_y * self.region_size + y][region_x * self.region_size + x]
 
+    def get_all_subregions(self, positions: list[tuple[int]]) -> list[Region]:
+        """Returns a list of subregions corresponding to a list of coordinates"""
+        result = []
+
+        for x, y in positions:
+            try:
+                result.append(self.subregions[y][x])
+            except IndexError:
+                result.append(None)
+
+        return result
+
     def create_plates(self, land_amount: int, water_amount: int, odd_amount: int,
                       margin: float, island_rate: float,
                       min_growth: int, max_growth: int, odd_growth: int,
@@ -223,7 +235,7 @@ class World():
         area = 0
         for circle in self.regions:
             for region in circle:
-                if region.terrain in (constants.LAND, constants.MOUNTAIN):
+                if constants.is_type(region.terrain, constants.LAND):
                     area += region.metrics.area
         return area
 
@@ -232,7 +244,7 @@ class World():
         area = 0
         for circle in self.regions:
             for region in circle:
-                if region.terrain in (constants.WATER, constants.SHALLOWS, constants.SHALLOWS_2):
+                if constants.is_type(region.terrain, constants.WATER):
                     area += region.metrics.area
         return area
 

@@ -43,6 +43,11 @@ class Main(QtWidgets.QMainWindow):
     REGION_LENGTH: int = 60
     REGION_HEIGHT: int = 30
 
+    X_START: tuple[int] = (None, 0, None, 1, None, 1, None, 0, None)
+    Y_START: tuple[int] = (None, 0, None, 0, None, 1, None, 1, None)
+    X_END: tuple[int] = (None, 1, None, 1, None, 0, None, 0, None)
+    Y_END: tuple[int] = (None, 0, None, 1, None, 1, None, 0, None)
+
     def __init__(self):
         super().__init__()
 
@@ -169,19 +174,66 @@ class Main(QtWidgets.QMainWindow):
         except IndexError:
             return False
 
-    def paint_world(self, paint_plate_borders: bool = True):
+    def paint_edges(self, painter: QtGui.QPainter, x: int, y: int,
+                    surrounding_terrain: int, edge_color: QColor,
+                    corner_color: QColor, width: int = 1, corner_width: int = 2) -> None:
+        """Paints the edges of a subregion in the edge color
+        if the subregion borders to the given terrain"""
+
+        # If two edges are both of the surronding terrain,
+        # more edge color should be applied close to the corner
+        # Then, a rounding should be applied at the corner
+        coordinates = constants.get_surroundings(
+            x, y, self.world.sub_length, self.world.sub_height)
+        regions = self.world.get_all_subregions(coordinates)
+        size = 1440 // self.world.sub_length
+
+        pen = QtGui.QPen()
+        pen.setWidth(width)
+        pen.setColor(edge_color)
+        painter.setPen(pen)
+
+        for dir in range(1, 8, 2):
+            if regions[dir] is not None and \
+                    constants.is_type(regions[dir].terrain, surrounding_terrain):
+                painter.drawLine(
+                    x*size + (width-1) + (size-1-(width-1))*Main.X_START[dir],
+                    y*size + (width-1) + (size-1-(width-1))*Main.Y_START[dir],
+                    x*size + (width-1) + (size-1-(width-1))*Main.X_END[dir],
+                    y*size + (width-1) + (size-1-(width-1))*Main.Y_END[dir])
+
+        if corner_color is None:
+            return
+
+        corner_pen = QtGui.QPen()
+        corner_pen.setWidth(corner_width)
+        corner_pen.setColor(corner_color)
+        painter.setPen(corner_pen)
+
+        for dir in range(1, 8, 2):
+            next_dir = (dir + 2) % 8
+            if regions[dir] is not None and regions[next_dir] is not None and \
+                constants.is_type(regions[dir].terrain, surrounding_terrain) and \
+                    constants.is_type(regions[next_dir].terrain, surrounding_terrain):
+                # Line drawing is done clockwise around the cell
+                # So a north line ends in the northeast. I can use that here
+                painter.drawPoint(
+                    x*size + (size-1)*Main.X_END[dir],
+                    y*size + (size-1)*Main.Y_END[dir])
+
+    def paint_world(self, paint_plate_borders: bool = True) -> None:
         """Paints regions or subregions"""
         painter = QtGui.QPainter(self.screen.pixmap())
         pen = QtGui.QPen()
 
-        if self.precision == constants.SUBREGION:
+        if self.precision == constants.SUBREGION or self.precision == constants.REGION:
             map = self.world.subregions
             length = self.world.sub_length
             height = self.world.sub_height
-        else:
-            map = self.world.regions
-            length = self.world.length
-            height = self.world.height
+        # else:
+        #     map = self.world.regions
+        #     length = self.world.length
+        #     height = self.world.height
 
         point = 1440 // length
         pen.setWidth(point)
@@ -196,6 +248,28 @@ class Main(QtWidgets.QMainWindow):
                 pen.setColor(constants.get_color(region.terrain))
                 painter.setPen(pen)
                 painter.drawPoint(point//2 + x*point, point//2 + y*point)
+
+                # This sure is taking a lot of time to draw
+                # I guess the color changes is what takes up the time
+                # In that case I can draw all land first
+                # Then all sea
+                # Then all land edges
+                # Then all sea edges
+                if constants.is_type(region.terrain, constants.LAND):
+                    self.paint_edges(painter, x, y, constants.WATER,
+                                     constants.get_color(constants.SHORE),
+                                     constants.get_color(constants.SHALLOWS),
+                                     width=2, corner_width=2)
+
+                # It's very small, so try and increase the size?
+                # But that comes with a loss of precision
+                # Or do I increase size to 3 and shift starting point?
+                # That width increase created some odd details
+                if constants.is_type(region.terrain, constants.WATER):
+                    self.paint_edges(painter, x, y, constants.LAND,
+                                     constants.get_color(constants.SHALLOWS),
+                                     constants.get_color(constants.SHORE),
+                                     width=2, corner_width=2)
 
                 if paint_plate_borders and self.has_plate_border(
                         map, region, x, y, constants.EAST):

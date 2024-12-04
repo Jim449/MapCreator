@@ -13,14 +13,14 @@ LAND = 9
 WATER = 10
 MOUNTAIN = 11
 SHALLOWS = 12
-SHALLOWS_2 = 13
+SHORE = 13
 
 PLATE_BORDER_COLOR = QColor(120, 30, 0)
 GRID_COLOR = QColor(150, 150, 180)
 LINE_COLOR = QColor(90, 90, 120)
 
 COLORS = {WATER: QColor(22, 134, 174), LAND: QColor(189, 171, 123), MOUNTAIN: QColor(144, 134, 103),
-          SHALLOWS: QColor(110, 154, 174)}
+          SHALLOWS: QColor(110, 154, 174), SHORE: QColor(162, 139, 100)}
 
 REGION = "Region"
 SUBREGION = "Subregion"
@@ -49,9 +49,9 @@ def is_type(type: int, cathegory: int):
     if type == cathegory:
         return True
     elif cathegory == LAND:
-        return type in (MOUNTAIN)
+        return type in (MOUNTAIN,)
     elif cathegory == WATER:
-        return type in (SHALLOWS)
+        return type in (SHALLOWS,)
 
 
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
@@ -70,7 +70,8 @@ def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
 
 def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[int]:
     """Returns coordinates (x,y) after travelling once in an direction.
-    The result is a valid, positive index of a two-dimensional list"""
+    The x-value loops, returning a positive, valid index.
+    The y-value doesn't loop, possibly returning an invalid index."""
     nx = x
     ny = y
 
@@ -85,11 +86,6 @@ def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[
         nx -= 1
 
     nx = nx % length
-
-    if ny >= height:
-        ny = height
-    elif ny < 0:
-        ny = 0
 
     return (nx, ny)
 
@@ -122,3 +118,15 @@ def angle_direction(dir: int, steps_of_eight: int) -> int:
     if dir > 8:
         dir -= 8
     return dir
+
+
+def get_surroundings(x: int, y: int, length: int, height: int) -> list[tuple[int]]:
+    """Returns coordinates representing the surroundings of point (x,y) in all eight directions.
+    For instance, accessing result[constants.NORTH] will give the coordinates to the north.
+    The first item, result[constants.CENTER], is the unmodified (x,y)"""
+    result = []
+
+    for dir in range(9):
+        result.append(get_next_index(x, y, dir, length, height))
+
+    return result
