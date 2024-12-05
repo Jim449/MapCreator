@@ -248,24 +248,6 @@ class World():
                     area += region.metrics.area
         return area
 
-    @DeprecationWarning
-    def _find_coastline_entrance(self, northeast: Region, southeast: Region,
-                                 southwest: Region, northwest: Region) -> int:
-        """Finds the direction of the coastline entrance,
-        given that land is counter-clockwise to the coastline entrance"""
-        # There are instances where there are two possible coastline entrances
-        # This is hard to deal with
-        # I can, however, find a starting region and get the entrance from there
-        # It won't require the use of this method
-        if northwest.terrain == constants.LAND and northeast.terrain == constants.WATER:
-            return constants.NORTH
-        elif northeast.terrain == constants.LAND and southeast.terrain == constants.WATER:
-            return constants.EAST
-        elif southeast.terrain == constants.LAND and southwest.terrain == constants.WATER:
-            return constants.SOUTH
-        elif southwest.terrain == constants.LAND and northwest.terrain == constants.WATER:
-            return constants.WEST
-
     def _find_coastline_exit(self, entrance: int, northeast: Region, southeast: Region,
                              southwest: Region, northwest: Region) -> int:
         """Finds the direction of the coastline exit,
@@ -340,7 +322,7 @@ class World():
             else:
                 break
 
-    def create_region_coastline(self, x: int, y: int) -> list[Region]:
+    def find_region_coastline(self, x: int, y: int) -> list[Region]:
         """Generate a random coastline for the given a land region.
         Returns a list of coastline regions.
         If the coordinates points to an ocean region, returns None"""

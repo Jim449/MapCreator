@@ -56,15 +56,25 @@ class ContinentOptions():
         self.land_mountain.clicked.connect(main.create_mountains_on_land)
         self.layout.addWidget(self.land_mountain)
 
-        self.mountain_offset_label = QtWidgets.QLabel("Distance to shore")
-        self.layout.addWidget(self.mountain_offset_label)
+        self.min_offset_label = QtWidgets.QLabel("Minimum distance\nto shore")
+        self.layout.addWidget(self.min_offset_label)
 
-        self.mountain_offset = QtWidgets.QSpinBox()
-        self.mountain_offset.setMinimum(0)
-        self.mountain_offset.setMaximum(20)
-        self.mountain_offset.setSingleStep(1)
-        self.mountain_offset.setValue(1)
-        self.layout.addWidget(self.mountain_offset)
+        self.min_offset = QtWidgets.QSpinBox()
+        self.min_offset.setMinimum(1)
+        self.min_offset.setMaximum(20)
+        self.min_offset.setSingleStep(1)
+        self.min_offset.setValue(2)
+        self.layout.addWidget(self.min_offset)
+
+        self.max_offset_label = QtWidgets.QLabel("Maximum distance\nto shore")
+        self.layout.addWidget(self.max_offset_label)
+
+        self.max_offset = QtWidgets.QSpinBox()
+        self.max_offset.setMinimum(1)
+        self.max_offset.setMaximum(20)
+        self.max_offset.setSingleStep(1)
+        self.max_offset.setValue(2)
+        self.layout.addWidget(self.max_offset)
 
         self.sea_mountain = QtWidgets.QPushButton("Generate by sea")
         self.sea_mountain.clicked.connect(main.create_mountains_by_sea)

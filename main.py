@@ -43,10 +43,10 @@ class Main(QtWidgets.QMainWindow):
     REGION_LENGTH: int = 60
     REGION_HEIGHT: int = 30
 
-    X_START: tuple[int] = (None, 0, None, 1, None, 1, None, 0, None)
-    Y_START: tuple[int] = (None, 0, None, 0, None, 1, None, 1, None)
-    X_END: tuple[int] = (None, 1, None, 1, None, 0, None, 0, None)
-    Y_END: tuple[int] = (None, 0, None, 1, None, 1, None, 0, None)
+    X_START: tuple[int] = (None, 0, 1, 1, 1, 1, 0, 0, 0)
+    Y_START: tuple[int] = (None, 0, 0, 0, 1, 1, 1, 1, 0)
+    X_END: tuple[int] = (None, 1, 1, 1, 1, 0, 0, 0, 0)
+    Y_END: tuple[int] = (None, 0, 0, 1, 1, 1, 1, 0, 0)
 
     def __init__(self):
         super().__init__()
@@ -94,17 +94,25 @@ class Main(QtWidgets.QMainWindow):
         self.options_layout.addLayout(self.toolbar.layout)
         self.options_layout.addLayout(self.view_options.layout)
 
-        # Add everything
-        self.layout.addLayout(self.info_layout)
-        self.layout.addLayout(self.map_layout)
-
         # Right panel - show a single panel, starting with plate generation
+        self.tool_layout = QtWidgets.QVBoxLayout()
+
         self.plate_options = PlateOptions(self)
         self.continent_options = ContinentOptions(self)
         self.boundary_options = BoundaryOptions(self)
 
-        self.layout.addWidget(self.plate_options.frame)
+        self.tool_layout.addWidget(self.plate_options.frame)
+        self.tool_layout.addWidget(self.continent_options.frame)
+        self.tool_layout.addWidget(self.boundary_options.frame)
+
         self.current_tool = self.plate_options
+        self.continent_options.frame.hide()
+        self.boundary_options.frame.hide()
+
+        # Add everything
+        self.layout.addLayout(self.info_layout)
+        self.layout.addLayout(self.map_layout)
+        self.layout.addLayout(self.tool_layout)
 
         # Central widget to get things going
         widget = QtWidgets.QWidget()
@@ -175,10 +183,14 @@ class Main(QtWidgets.QMainWindow):
             return False
 
     def paint_edges(self, painter: QtGui.QPainter, x: int, y: int,
-                    surrounding_terrain: int, edge_color: QColor,
-                    corner_color: QColor, width: int = 1, corner_width: int = 2) -> None:
+                    surrounding_terrain: int,
+                    edge_color: QColor = None, width: int = 1,
+                    corner_color: QColor = None, corner_width: int = 1,
+                    diagonal_color: QColor = None, diagonal_width: int = 0) -> None:
         """Paints the edges of a subregion in the edge color
         if the subregion borders to the given terrain"""
+
+        # TODO This method is doing too much STUFF!
 
         # If two edges are both of the surronding terrain,
         # more edge color should be applied close to the corner
@@ -188,38 +200,53 @@ class Main(QtWidgets.QMainWindow):
         regions = self.world.get_all_subregions(coordinates)
         size = 1440 // self.world.sub_length
 
-        pen = QtGui.QPen()
-        pen.setWidth(width)
-        pen.setColor(edge_color)
-        painter.setPen(pen)
+        if edge_color is not None:
+            pen = QtGui.QPen()
+            pen.setWidth(width)
+            pen.setColor(edge_color)
+            painter.setPen(pen)
 
-        for dir in range(1, 8, 2):
-            if regions[dir] is not None and \
-                    constants.is_type(regions[dir].terrain, surrounding_terrain):
-                painter.drawLine(
-                    x*size + (width-1) + (size-1-(width-1))*Main.X_START[dir],
-                    y*size + (width-1) + (size-1-(width-1))*Main.Y_START[dir],
-                    x*size + (width-1) + (size-1-(width-1))*Main.X_END[dir],
-                    y*size + (width-1) + (size-1-(width-1))*Main.Y_END[dir])
+            for dir in range(1, 8, 2):
+                if regions[dir] is not None and \
+                        constants.is_type(regions[dir].terrain, surrounding_terrain):
+                    painter.drawLine(
+                        x*size + (width-1) + (size-1-(width-1)) *
+                        Main.X_START[dir],
+                        y*size + (width-1) + (size-1-(width-1)) *
+                        Main.Y_START[dir],
+                        x*size + (width-1) + (size-1-(width-1)) *
+                        Main.X_END[dir],
+                        y*size + (width-1) + (size-1-(width-1))*Main.Y_END[dir])
 
-        if corner_color is None:
-            return
+        if corner_color is not None:
+            corner_pen = QtGui.QPen()
+            corner_pen.setWidth(corner_width)
+            corner_pen.setColor(corner_color)
+            painter.setPen(corner_pen)
 
-        corner_pen = QtGui.QPen()
-        corner_pen.setWidth(corner_width)
-        corner_pen.setColor(corner_color)
-        painter.setPen(corner_pen)
+            for dir in range(1, 8, 2):
+                next_dir = (dir + 2) % 8
+                if regions[dir] is not None and regions[next_dir] is not None and \
+                    constants.is_type(regions[dir].terrain, surrounding_terrain) and \
+                        constants.is_type(regions[next_dir].terrain, surrounding_terrain):
+                    # Line drawing is done clockwise around the cell
+                    # So a north line ends in the northeast. I can use that here
+                    painter.drawPoint(
+                        x*size + (size-1)*Main.X_END[dir],
+                        y*size + (size-1)*Main.Y_END[dir])
 
-        for dir in range(1, 8, 2):
-            next_dir = (dir + 2) % 8
-            if regions[dir] is not None and regions[next_dir] is not None and \
-                constants.is_type(regions[dir].terrain, surrounding_terrain) and \
-                    constants.is_type(regions[next_dir].terrain, surrounding_terrain):
-                # Line drawing is done clockwise around the cell
-                # So a north line ends in the northeast. I can use that here
-                painter.drawPoint(
-                    x*size + (size-1)*Main.X_END[dir],
-                    y*size + (size-1)*Main.Y_END[dir])
+        if diagonal_color is not None:
+            diagonal_pen = QtGui.QPen()
+            diagonal_pen.setWidth(diagonal_width)
+            diagonal_pen.setColor(diagonal_color)
+            center_terrain = regions[0].terrain
+            painter.setPen(diagonal_pen)
+
+            for dir in range(2, 9, 2):
+                if regions[dir] is not None and regions[dir].terrain == center_terrain:
+                    painter.drawPoint(
+                        x*size + (size-1)*Main.X_END[dir],
+                        y*size + (size-1)*Main.Y_END[dir])
 
     def paint_world(self, paint_plate_borders: bool = True) -> None:
         """Paints regions or subregions"""
@@ -255,21 +282,27 @@ class Main(QtWidgets.QMainWindow):
                 # Then all sea
                 # Then all land edges
                 # Then all sea edges
-                if constants.is_type(region.terrain, constants.LAND):
+                if region.terrain == constants.LAND:
                     self.paint_edges(painter, x, y, constants.WATER,
-                                     constants.get_color(constants.SHORE),
-                                     constants.get_color(constants.SHALLOWS),
+                                     edge_color=constants.get_color(
+                                         constants.SHORE),
+                                     corner_color=constants.get_color(
+                                         constants.SHALLOWS),
                                      width=2, corner_width=2)
-
-                # It's very small, so try and increase the size?
-                # But that comes with a loss of precision
-                # Or do I increase size to 3 and shift starting point?
-                # That width increase created some odd details
-                if constants.is_type(region.terrain, constants.WATER):
+                elif region.terrain == constants.WATER:
                     self.paint_edges(painter, x, y, constants.LAND,
-                                     constants.get_color(constants.SHALLOWS),
-                                     constants.get_color(constants.SHORE),
+                                     edge_color=constants.get_color(
+                                         constants.SHALLOWS),
+                                     corner_color=constants.get_color(
+                                         constants.SHORE),
                                      width=2, corner_width=2)
+                elif region.terrain == constants.MOUNTAIN:
+                    self.paint_edges(painter, x, y, constants.FLATLAND,
+                                     corner_color=constants.get_color(
+                                         constants.LAND),
+                                     diagonal_color=constants.get_color(
+                                         constants.MOUNTAIN),
+                                     corner_width=1, diagonal_width=4)
 
                 if paint_plate_borders and self.has_plate_border(
                         map, region, x, y, constants.EAST):
@@ -436,17 +469,22 @@ class Main(QtWidgets.QMainWindow):
 
     def create_mountains_on_land(self):
         """Creates mountain ranges on selected plate, where it meets a continental plate"""
-        for region in self.selected_plate.find_boundary_offset(0, constants.LAND):
-            if region.terrain == constants.LAND:
-                region.terrain = constants.MOUNTAIN
+        regions = self.selected_plate.find_border_offset(constants.LAND, constants.LAND,
+                                                         1, 1)
+        for region in regions:
+            region.terrain = constants.MOUNTAIN
         self.view_continents()
 
     def create_mountains_by_sea(self):
         """Creates mountain ranges on selected plate, where it meets an oceanic plate"""
-        offset = self.continent_options.mountain_offset.value()
-        for region in self.selected_plate.find_boundary_offset(offset, constants.WATER):
-            if region.terrain == constants.LAND:
-                region.terrain = constants.MOUNTAIN
+        min_offset = self.continent_options.min_offset.value()
+        max_offset = self.continent_options.max_offset.value()
+        regions = self.selected_plate.find_border_offset(constants.LAND, constants.WATER,
+                                                         min_offset, max_offset)
+
+        for region in regions:
+            region.terrain = constants.MOUNTAIN
+
         self.view_continents()
 
     def erase_mountains(self):
@@ -456,13 +494,28 @@ class Main(QtWidgets.QMainWindow):
                 region.terrain = constants.LAND
         self.view_continents()
 
+    def open_plate_options(self):
+        self.current_tool.frame.hide()
+        self.plate_options.frame.show()
+        self.current_tool = self.plate_options
+
+    def open_continent_options(self):
+        self.current_tool.frame.hide()
+        self.continent_options.frame.show()
+        self.current_tool = self.continent_options
+
+    def open_boundary_options(self):
+        self.current_tool.frame.hide()
+        self.boundary_options.frame.show()
+        self.current_tool = self.boundary_options
+
     def select_coastline(self):
         """Selects a coastline"""
         # Create region coastline will be updated to create a new coastline
         # I may want to just select the coastline first
         # Then, the user can randomize it any number of times
         # and I won't have to redo the coastline search
-        coastline = self.world.create_region_coastline(
+        coastline = self.world.find_region_coastline(
             self.selected_region.x, self.selected_region.y)
         self.paint_coastline(coastline)
 

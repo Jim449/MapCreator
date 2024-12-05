@@ -447,63 +447,91 @@ class Plate():
             region.ascending_land_check = False
             region.descending_land_check = False
 
-    def find_boundary_offset(self, distance: int, by_terrain: int) -> list[Region]:
-        """Finds all regions with the given distance from the plate boundary.
-        Only applies if the terrain outside of the plate is belongs to the given
-        terrain cathegory, LAND or WATER."""
-        result = []
+    def find_boundary(self) -> list[Region]:
+        """Returns a list of regions, located at the plate boundary of this plate.
+        Before calling this method, world.find_plate_boundaries must be called"""
+        boundary = []
 
         for region in self.claimed_regions:
-            if region.north_boundary == region.south_boundary \
-                    and region.east_boundary == region.west_boundary:
-                continue
+            if region.is_boundary():
+                boundary.append(region)
 
-            x = region.x
-            y = region.metrics.y
-            outer_x = region.x
-            outer_y = region.metrics.y
+        return boundary
 
-            if region.north_boundary and region.south_boundary == False:
-                y = region.metrics.y + distance
-                outer_y = region.metrics.y - 1
-            if region.east_boundary and region.west_boundary == False:
-                x = (region.x - distance) % self.max_x
-                outer_x = (region.x + 1) % self.max_x
-            if region.south_boundary and region.north_boundary == False:
-                y = region.metrics.y - distance
-                outer_y = region.metrics.y + 1
-            if region.west_boundary and region.east_boundary == False:
-                x = (region.x + distance) % self.max_x
-                outer_x = (region.x - 1) % self.max_x
+    def find_border_of_terrain(self, external_terrain: int) -> list[Region]:
+        """Returns a list of regions at the plate border,
+        so that the terrain beyond the plate border equals the given terrain
+        (for at least one region immediately beyond the plate).
+        Before calling this method, world.find_plate_boundaries must be called"""
+        border = []
 
-            if y < 0:
-                y = 0
-            elif y >= self.max_y:
-                y = self.max_y - 1
+        for region in self.claimed_regions:
+            for dir in range(1, 8, 2):
+                if region.has_boundary_at(dir):
+                    x, y = constants.get_next_index(region.x, region.metrics.y,
+                                                    dir, self.max_x, self.max_y)
+                    neighbor: Region = self.world_map[y][x]
 
-            outskirts = self.world_map[outer_y][outer_x].terrain
+                    if constants.is_type(neighbor.terrain, external_terrain) and region not in border:
+                        region.border_distance = 1
+                        border.append(region)
+        return border
 
-            if by_terrain == outskirts or \
-                    (by_terrain == constants.LAND and outskirts == constants.MOUNTAIN):
-                # Saves me some calculations
-                if distance == 0:
-                    result.append(region)
-                    continue
+    def find_border_distance(self, external_terrain: int, max_distance: int = 100) -> list[list[Region]]:
+        """Returns a two-dimensional list of regions,
+        where list at index i respresents regions with distance i+1
+        to an out-of-plate region with terrain equal to the given external terrain
+        The algorithm terminates at max distance or when all regions have been found.
+        """
+        for region in self.claimed_regions:
+            region.border_distance = -1
 
-                if x != region.x and y != region.metrics.y:
-                    # The diagonal alone won't suffice. Take the horizontal and vertical too
-                    # Leave a non-mountain margin since distance > 0
-                    vertical = self.world_map[region.metrics.y][x]
-                    if vertical.plate == self.id and vertical.is_boundary() == False:
-                        result.append(vertical)
+        circles = []
+        current_circle = self.find_border_of_terrain(external_terrain)
+        circles.append(current_circle)
 
-                    horizontal = self.world_map[y][region.x]
-                    if horizontal.plate == self.id and horizontal.is_boundary() == False:
-                        result.append(horizontal)
+        if max_distance == 1:
+            return circles
 
-                inner = self.world_map[y][x]
-                if inner.plate == self.id and inner.is_boundary() == False:
-                    result.append(self.world_map[y][x])
+        for distance in range(2, max_distance + 1):
+            previous_circle = current_circle
+            current_circle = []
+
+            for region in previous_circle:
+                for dir in range(1, 8, 2):
+                    x, y = constants.get_next_index(region.x, region.metrics.y,
+                                                    dir, self.max_x, self.max_y)
+                    neighbor: Region = self.world_map[y][x]
+
+                    if neighbor.plate == self.id and neighbor.border_distance == -1:
+                        neighbor.border_distance = distance
+                        current_circle.append(neighbor)
+
+            if len(current_circle) > 0:
+                circles.append(current_circle)
+            else:
+                return circles
+        return circles
+
+    def find_border_offset(self, internal_terrain: int, external_terrain: int,
+                           min_distance: int, max_distance: int) -> list[Region]:
+        """Returns a list of regions, so that the distance to a
+        out-of-plate region of given external terrain is between
+        min distance and max distance, and the resulting regions terrain
+        equals the internal terrain.
+        (only out-of-plate regions next to the plate border are considered)"""
+        result = []
+        circles = self.find_border_distance(external_terrain, max_distance)
+
+        distance = 1
+
+        for circle in circles:
+            if distance >= min_distance:
+                for region in circle:
+                    if constants.is_type(region.terrain, internal_terrain):
+                        result.append(region)
+            distance += 1
+
         return result
 
     def get_info(self) -> str:

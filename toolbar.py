@@ -14,9 +14,11 @@ class Toolbar():
         self.layout.addWidget(self.plate_generation_tool)
 
         self.continent_tool = QtWidgets.QPushButton(text="Continent tools")
+        self.continent_tool.clicked.connect(main.open_continent_options)
         self.layout.addWidget(self.continent_tool)
 
         self.boundary_tool = QtWidgets.QPushButton(text="Boundary tools")
+        self.boundary_tool.clicked.connect(main.open_boundary_options)
         self.layout.addWidget(self.boundary_tool)
 
         self.plate_tool = QtWidgets.QPushButton(text="Paint plates")

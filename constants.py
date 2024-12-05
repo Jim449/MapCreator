@@ -14,13 +14,17 @@ WATER = 10
 MOUNTAIN = 11
 SHALLOWS = 12
 SHORE = 13
+DEPTHS = 14
+CLIFFS = 15
+FLATLAND = 16
 
 PLATE_BORDER_COLOR = QColor(120, 30, 0)
 GRID_COLOR = QColor(150, 150, 180)
 LINE_COLOR = QColor(90, 90, 120)
 
-COLORS = {WATER: QColor(22, 134, 174), LAND: QColor(189, 171, 123), MOUNTAIN: QColor(144, 134, 103),
-          SHALLOWS: QColor(110, 154, 174), SHORE: QColor(162, 139, 100)}
+COLORS = {WATER: QColor(22, 134, 174), LAND: QColor(189, 171, 123), MOUNTAIN: QColor(118, 108, 93),
+          SHALLOWS: QColor(110, 154, 174), SHORE: QColor(162, 139, 100), DEPTHS: QColor(11, 117, 156),
+          CLIFFS: QColor(144, 128, 100)}
 
 REGION = "Region"
 SUBREGION = "Subregion"
@@ -49,9 +53,11 @@ def is_type(type: int, cathegory: int):
     if type == cathegory:
         return True
     elif cathegory == LAND:
-        return type in (MOUNTAIN,)
+        return type in (MOUNTAIN, CLIFFS, SHORE)
     elif cathegory == WATER:
-        return type in (SHALLOWS,)
+        return type in (SHALLOWS, DEPTHS)
+    elif cathegory == FLATLAND:
+        return type in (LAND, SHORE)
 
 
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
@@ -127,6 +133,18 @@ def get_surroundings(x: int, y: int, length: int, height: int) -> list[tuple[int
     result = []
 
     for dir in range(9):
+        result.append(get_next_index(x, y, dir, length, height))
+
+    return result
+
+
+def get_close_surrondings(x: int, y: int, length: int, height: int) -> list[tuple[int]]:
+    """Returns coordinates representing the surroundings of point (x,y) in four directions.
+    Returns a list of coordinates, corresponding to directions north, east, south, west,
+    in that order"""
+    result = []
+
+    for dir in range(1, 8, 2):
         result.append(get_next_index(x, y, dir, length, height))
 
     return result
