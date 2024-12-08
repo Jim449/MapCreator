@@ -109,6 +109,18 @@ class World():
 
         return result
 
+    def get_subregions_by_terrain(self) -> dict[list[Region]]:
+        """Returns all subregions divided by terrain"""
+        result = {}
+
+        for row in self.subregions:
+            for subregion in row:
+                if subregion.terrain in result:
+                    result[subregion.terrain].append(subregion)
+                else:
+                    result[subregion.terrain] = [subregion]
+        return result
+
     def create_plates(self, land_amount: int, water_amount: int, odd_amount: int,
                       margin: float, island_rate: float,
                       min_growth: int, max_growth: int, odd_growth: int,
@@ -411,12 +423,13 @@ class World():
         """Generates terrain using a line generator"""
         start_x, start_y = line.get_grid_offset()
 
-        for x in line.length:
-            for y in line.height:
+        for x in range(line.length):
+            for y in range(line.height):
+                # TODO I get an index error when land crosses east-west-barrier. Fix it!
                 subregion = self.get_subregion(start_x + x, start_y + y)
                 terrain = line.get_terrain(x, y)
 
-                if not constants.is_type(subregion.type, terrain):
+                if not constants.is_type(subregion.terrain, terrain):
                     subregion.terrain = terrain
 
     def generate_region_coastline(self):

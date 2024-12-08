@@ -249,10 +249,10 @@ class LineGenerator():
             return
 
         self.grid[y][x] = terrain
-        self.fill_terrain(x, y - 1, terrain)
-        self.fill_terrain(x + 1, y, terrain)
-        self.fill_terrain(x, y + 1, terrain)
-        self.fill_terrain(x - 1, y, terrain)
+        self._fill_terrain(x, y - 1, terrain)
+        self._fill_terrain(x + 1, y, terrain)
+        self._fill_terrain(x, y + 1, terrain)
+        self._fill_terrain(x - 1, y, terrain)
 
     def _strip_grid(self):
         """Removes the outer elements of the grid"""

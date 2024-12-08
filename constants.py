@@ -96,6 +96,43 @@ def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[
     return (nx, ny)
 
 
+def get_side(dir: int, width: int = 1, cell_size: int = 4) -> tuple[int]:
+    """Returns coordinates, width and height (x1, y1, w, h) required to draw the edge of a square"""
+    if dir == NORTH:
+        return (0, 0, cell_size, width)
+    elif dir == EAST:
+        return (cell_size - width, 0, width, cell_size)
+    elif dir == SOUTH:
+        return (0, cell_size - width, cell_size, cell_size)
+    elif dir == WEST:
+        return (0, 0, width, cell_size)
+
+
+def get_corner(dir: int, cell_size: int = 4) -> tuple[int]:
+    """Returns the coordinates (x, y) at the corner of a square"""
+    if dir == NORTHEAST:
+        return (cell_size - 1, 0)
+    elif dir == SOUTHEAST:
+        return (cell_size - 1, cell_size - 1)
+    elif dir == SOUTHWEST:
+        return (0, cell_size - 1)
+    elif dir == NORTHWEST:
+        return (0, 0)
+
+
+def get_corner_line(dir: int, distance: int = 1, cell_size: int = 4) -> tuple[int]:
+    """Returns the line (x1, y1, x2, y2) cutting of the corner of a square.
+    Provide the distance between the corner and line start- / endpoints"""
+    if dir == NORTHEAST:
+        return (cell_size - 1 - distance, 0, cell_size - 1, distance)
+    elif dir == SOUTHEAST:
+        return (cell_size - 1, cell_size - 1 - distance, cell_size - 1 - distance, cell_size - 1)
+    elif dir == SOUTHWEST:
+        return (distance, cell_size - 1, 0, cell_size - 1 - distance)
+    elif dir == NORTHWEST:
+        return (0, distance, distance, 0)
+
+
 def within_bounds(x: int, y: int, length: int, height: int) -> bool:
     """Returns true if (x,y) are valid, positive coordinates
     of a two-dimensional list"""
