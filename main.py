@@ -10,7 +10,7 @@ from toolbar import Toolbar
 from region import Region
 from plate import Plate
 import constants
-import random
+from pandas import DataFrame
 
 
 class Main(QtWidgets.QMainWindow):
@@ -334,6 +334,26 @@ class Main(QtWidgets.QMainWindow):
                              (region.metrics.y + 1) * Main.REGION_SIZE - 1)
         painter.end()
 
+    def _paint_kilometer(self, x, y, painter: QtGui.QPainter):
+        painter.drawPoint(720 + x, 26 + y)
+
+    def paint_region_map(self, map: DataFrame):
+        """Paints all square kilometers of a region"""
+        painter = QtGui.QPainter(self.screen.pixmap())
+        painter.fillRect(0, 0, 1440, 720, QColor(0, 0, 0))
+
+        for terrain in map["terrain"].unique():
+
+            pen = QtGui.QPen()
+            pen.setColor(constants.get_color(terrain))
+            pen.setWidth(1)
+            painter.setPen(pen)
+            landscape = map.loc[map["terrain"] == terrain]
+            landscape.apply(
+                axis=1, func=lambda row: self._paint_kilometer(row["x"], row["y"], painter))
+
+        painter.end()
+
     def expand_plates(self):
         """Expands plates by one growth step and paints the progress.
         When finished, generates continents and paints the map"""
@@ -502,6 +522,24 @@ class Main(QtWidgets.QMainWindow):
             self.paint_lines()
         if self.view_options.view_plate_borders.isChecked():
             self.paint_plate_borders()
+        self.update()
+
+    def view_square_kilometers(self, x: int, y: int):
+        # TODO Create a map for now
+        # Yeah, this looks correct
+        # BUT IT TAKES FOREVER TO OPEN!
+        # Of course, it doesn't have any terrain yet, it's just blue
+        # Terrain has to be passed from the subregion
+        # I need to set a flag after view_options.zoom_region is presssed
+        # Then, the user can select a region to open it
+        # I should update available tools
+        # Maybe disable all tools when flag is set
+        # Leave view_world as an option, in case user changes his mind
+        # Then, enable relevant tools for region zoom
+        # Try extending view to two regions?
+        # I do have space for that
+        # but it might look bad since I have to move some cells left or right
+        self.paint_region_map(self.world.construct_region(x, y))
         self.update()
 
     def view_world_info(self):

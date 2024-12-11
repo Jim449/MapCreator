@@ -6,6 +6,7 @@ from line_generator import LineGenerator
 import constants
 import math
 import random
+from pandas import DataFrame
 
 
 class World():
@@ -33,6 +34,7 @@ class World():
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
+        self.km_squares: DataFrame = None
 
         self.fixed_growth = True
 
@@ -439,3 +441,40 @@ class World():
 
         for line in self.boundary.get_path():
             self.apply_line_on_region(line)
+
+    def construct_region(self, x: int, y: int) -> DataFrame:
+        """Constructs the region at (x, y) down to kilometer-level precision"""
+        # TODO At the moment, this just creates water
+        # I need to grab the right terrain
+        # Then, I want to store this region in the database so that changes are saved
+        # Then, I need a function to load a saved region
+        # Only call this method if the region didn't exist
+
+        data = []
+        line = []
+
+        for sub_y in range(self.region_size):
+            subregion = self.get_subregion_of_region(0, sub_y, x, y)
+            top = subregion.metrics.top_stretch
+            bottom = subregion.metrics.bottom_stretch
+            vertical = subregion.metrics.vertical_stretch
+
+            for step in range(vertical):
+                length = int(top + (bottom - top) * step / vertical)
+                # So we start with top + 0 // vertical = top
+                # And we end close to top + (bottom - top) * 1 = bottom
+                line.append(length)
+
+        for kilometer_y, stretch in enumerate(line):
+            for kilometer_x in range(stretch * self.region_size):
+
+                x = kilometer_x - (self.region_size * stretch) // 2
+
+                data.append({"x": x,
+                             "y": kilometer_y,
+                             "mile_x": x // 10,
+                             "mile_y": kilometer_y // 10,
+                             "terrain": constants.WATER})
+                # Grab terrain from mile later
+        self.km_squares = DataFrame.from_records(data)
+        return self.km_squares
