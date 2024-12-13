@@ -26,8 +26,11 @@ COLORS = {WATER: QColor(22, 134, 174), LAND: QColor(189, 171, 123), MOUNTAIN: QC
           SHALLOWS: QColor(110, 154, 174), SHORE: QColor(162, 139, 100), DEPTHS: QColor(11, 117, 156),
           CLIFFS: QColor(144, 128, 100)}
 
+WORLD = "World"
 REGION = "Region"
 SUBREGION = "Subregion"
+SQUARE_MILE = "Square mile"
+SQUARE_KILOMETER = "Square kilometer"
 
 
 def get_color(terrain: int) -> QColor:

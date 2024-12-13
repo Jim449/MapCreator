@@ -35,8 +35,7 @@ class ViewOptions():
 
         # View a random region for now
         self.zoom_region = QtWidgets.QPushButton(text="Open region")
-        self.zoom_region.clicked.connect(
-            lambda: main.view_square_kilometers(30, 3))
+        self.zoom_region.clicked.connect(main.full_zoom)
         self.layout.addWidget(self.zoom_region)
 
         self.layout.addStretch()

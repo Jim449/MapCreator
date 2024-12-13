@@ -6,6 +6,7 @@ from plate_options import PlateOptions
 from continent_options import ContinentOptions
 from boundary_options import BoundaryOptions
 from view_options import ViewOptions
+from tool_info import ToolInfo
 from toolbar import Toolbar
 from region import Region
 from plate import Plate
@@ -55,10 +56,11 @@ class Main(QtWidgets.QMainWindow):
         self.timer = QTimer()
         self.world = World(
             radius=6372, length=Main.REGION_LENGTH, height=Main.REGION_HEIGHT)
-        self.show_plate_borders: bool = True
-        self.show_coordinate_lines: bool = True
+
         self.selected_plate: Plate = None
         self.selected_region: Region = None
+        # Zoom level named from smallest visible area type
+        self.zoom_level: str = constants.SUBREGION
 
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(5)
@@ -100,14 +102,17 @@ class Main(QtWidgets.QMainWindow):
         self.plate_options = PlateOptions(self)
         self.continent_options = ContinentOptions(self)
         self.boundary_options = BoundaryOptions(self)
+        self.tool_info = ToolInfo()
 
         self.tool_layout.addWidget(self.plate_options.frame)
         self.tool_layout.addWidget(self.continent_options.frame)
         self.tool_layout.addWidget(self.boundary_options.frame)
+        self.tool_layout.addWidget(self.tool_info.frame)
 
         self.current_tool = self.plate_options
         self.continent_options.frame.hide()
         self.boundary_options.frame.hide()
+        self.tool_info.frame.hide()
 
         # Add everything
         self.layout.addLayout(self.info_layout)
@@ -484,12 +489,15 @@ class Main(QtWidgets.QMainWindow):
         self.boundary_options.generate_button.setEnabled(False)
         self.current_tool = self.boundary_options
 
+    def full_zoom(self):
+        """Prepares for a region full zoom"""
+        self.current_tool.frame.hide()
+        self.tool_info.set_text("Select the region to open")
+        self.tool_info.activate("Open region")
+        self.current_tool = self.tool_info
+
     def select_coastline(self, region: Region):
         """Selects a coastline"""
-        # Create region coastline will be updated to create a new coastline
-        # I may want to just select the coastline first
-        # Then, the user can randomize it any number of times
-        # and I won't have to redo the coastline search
         coastline = self.world.find_region_coastline(
             region.x, region.metrics.y)
         self.boundary_options.generate_button.setEnabled(True)
@@ -512,6 +520,7 @@ class Main(QtWidgets.QMainWindow):
 
     def view_continents(self, detailed: bool = True):
         """Paints the world map"""
+        self.zoom_level = constants.SUBREGION
         self.paint_world()
 
         if detailed:
@@ -524,22 +533,11 @@ class Main(QtWidgets.QMainWindow):
             self.paint_plate_borders()
         self.update()
 
-    def view_square_kilometers(self, x: int, y: int):
-        # TODO Create a map for now
-        # Yeah, this looks correct
-        # BUT IT TAKES FOREVER TO OPEN!
-        # Of course, it doesn't have any terrain yet, it's just blue
-        # Terrain has to be passed from the subregion
-        # I need to set a flag after view_options.zoom_region is presssed
-        # Then, the user can select a region to open it
-        # I should update available tools
-        # Maybe disable all tools when flag is set
-        # Leave view_world as an option, in case user changes his mind
-        # Then, enable relevant tools for region zoom
-        # Try extending view to two regions?
-        # I do have space for that
-        # but it might look bad since I have to move some cells left or right
-        self.paint_region_map(self.world.construct_region(x, y))
+    def view_square_kilometers(self, region: Region):
+        """Zooms the region"""
+        self.zoom_level = constants.SQUARE_KILOMETER
+        self.paint_region_map(
+            self.world.construct_region(region.x, region.metrics.y))
         self.update()
 
     def view_world_info(self):
@@ -561,17 +559,20 @@ Sea percentage: {sea_area / self.world.area:.0%}
             x = event.x()
             y = event.y()
 
-            header = "Region"
-            column = x // Main.REGION_SIZE
-            row = y // Main.REGION_SIZE
+            if self.zoom_level == constants.SUBREGION:
+                header = "Region"
+                column = x // Main.REGION_SIZE
+                row = y // Main.REGION_SIZE
 
-            self.selected_region = self.world.get_region(column, row)
-            self.info_label.setText(
-                f"{header}\n{self.selected_region.get_info()}")
+                self.selected_region = self.world.get_region(column, row)
+                self.info_label.setText(
+                    f"{header}\n{self.selected_region.get_info()}")
 
-            try:
-                self.selected_plate = self.world.get_plate(
-                    column, row, constants.REGION)
+                try:
+                    self.selected_plate = self.world.get_plate(
+                        column, row, constants.REGION)
+                except IndexError:
+                    pass
 
                 if self.current_tool == self.continent_options:
                     self.continent_options.type.setCurrentIndex(
@@ -584,7 +585,12 @@ Sea percentage: {sea_area / self.world.area:.0%}
                 elif self.current_tool == self.boundary_options:
                     self.select_coastline(self.selected_region)
 
-            except IndexError:
+                elif self.current_tool == self.tool_info:
+                    if self.tool_info.get_current_tool() == "Open region":
+                        self.view_square_kilometers(self.selected_region)
+
+            elif self.zoom_level == constants.SQUARE_KILOMETER:
+                # More options to come
                 pass
 
         return super().eventFilter(object, event)

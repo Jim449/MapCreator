@@ -11,6 +11,7 @@ class Toolbar():
 
         self.plate_generation_tool = QtWidgets.QPushButton(
             text="Plate generation")
+        self.plate_generation_tool.clicked.connect(main.open_plate_options)
         self.layout.addWidget(self.plate_generation_tool)
 
         self.continent_tool = QtWidgets.QPushButton(text="Continent tools")
