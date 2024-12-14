@@ -11,7 +11,6 @@ from toolbar import Toolbar
 from region import Region
 from plate import Plate
 import constants
-from pandas import DataFrame
 
 
 class Main(QtWidgets.QMainWindow):
@@ -339,24 +338,21 @@ class Main(QtWidgets.QMainWindow):
                              (region.metrics.y + 1) * Main.REGION_SIZE - 1)
         painter.end()
 
-    def _paint_kilometer(self, x, y, painter: QtGui.QPainter):
-        painter.drawPoint(720 + x, 26 + y)
-
-    def paint_region_map(self, map: DataFrame):
+    def paint_region_map(self, map: dict[list]):
         """Paints all square kilometers of a region"""
         painter = QtGui.QPainter(self.screen.pixmap())
         painter.fillRect(0, 0, 1440, 720, QColor(0, 0, 0))
 
-        for terrain in map["terrain"].unique():
+        unique = set(map["terrain"])
 
+        for terrain in unique:
             pen = QtGui.QPen()
             pen.setColor(constants.get_color(terrain))
             pen.setWidth(1)
             painter.setPen(pen)
-            landscape = map.loc[map["terrain"] == terrain]
-            landscape.apply(
-                axis=1, func=lambda row: self._paint_kilometer(row["x"], row["y"], painter))
 
+            for i in range(len(map["x"])):
+                painter.drawPoint(720 + map["x"][i], 26 + map["y"][i])
         painter.end()
 
     def expand_plates(self):
@@ -536,8 +532,9 @@ class Main(QtWidgets.QMainWindow):
     def view_square_kilometers(self, region: Region):
         """Zooms the region"""
         self.zoom_level = constants.SQUARE_KILOMETER
-        self.paint_region_map(
-            self.world.construct_region(region.x, region.metrics.y))
+        self.world.construct_region(region.x, region.metrics.y)
+        # Loops over a dict now. Don't try and loop over a dataframe, takes forever
+        self.paint_region_map(self.world.km_squares_dicts)
         self.update()
 
     def view_world_info(self):

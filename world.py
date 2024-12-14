@@ -34,7 +34,11 @@ class World():
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
-        self.km_squares: DataFrame = None
+
+        # TODO Test if I can save time by using dicts
+        # It did save time. Consider scrapping the DataFrame
+        self.km_squares_dicts: dict[list[str, int]] = None
+        # self.km_squares: DataFrame = None
 
         self.fixed_growth = True
 
@@ -442,7 +446,7 @@ class World():
         for line in self.boundary.get_path():
             self.apply_line_on_region(line)
 
-    def construct_region(self, x: int, y: int) -> DataFrame:
+    def construct_region(self, x: int, y: int) -> dict[list[str, int]]:
         """Constructs the region at (x, y) down to kilometer-level precision"""
         # TODO At the moment, this just creates water
         # I need to grab the right terrain
@@ -450,31 +454,33 @@ class World():
         # Then, I need a function to load a saved region
         # Only call this method if the region didn't exist
 
-        data = []
+        vertical = self.subregions[0][0].metrics.vertical_stretch
+        data = {"x": [], "y": [], "terrain": []}
         line = []
 
         for sub_y in range(self.region_size):
             subregion = self.get_subregion_of_region(0, sub_y, x, y)
             top = subregion.metrics.top_stretch
             bottom = subregion.metrics.bottom_stretch
-            vertical = subregion.metrics.vertical_stretch
 
             for step in range(vertical):
-                length = int(top + (bottom - top) * step / vertical)
-                # So we start with top + 0 // vertical = top
-                # And we end close to top + (bottom - top) * 1 = bottom
-                line.append(length)
+                horizontal = round(top + (bottom - top) * step / vertical)
+                line.append(horizontal)
 
         for kilometer_y, stretch in enumerate(line):
-            for kilometer_x in range(stretch * self.region_size):
+            for kilometer_x in range(stretch * (-self.region_size // 2),
+                                     stretch * (self.region_size // 2)):
 
-                x = kilometer_x - (self.region_size * stretch) // 2
+                # subregion_x = x // stretch
+                # subregion_y = kilometer_y // vertical
 
-                data.append({"x": x,
-                             "y": kilometer_y,
-                             "mile_x": x // 10,
-                             "mile_y": kilometer_y // 10,
-                             "terrain": constants.WATER})
+                data["x"].append(kilometer_x)
+                data["y"].append(kilometer_y)
+                # constants.WATER
+                data["terrain"].append(10)
                 # Grab terrain from mile later
-        self.km_squares = DataFrame.from_records(data)
-        return self.km_squares
+        # TODO remove dicts if they don't lead to improved looping speed
+        # Dicts did lead to improve speed. Scrap the dataframe!
+        self.km_squares_dicts = data
+        # self.km_squares = DataFrame(data)
+        return self.km_squares_dicts
