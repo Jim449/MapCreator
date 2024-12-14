@@ -33,20 +33,14 @@ class Main(QtWidgets.QMainWindow):
                     QColor(255, 87, 34), QColor(255, 138, 101),
                     QColor(255, 152, 0), QColor(255, 183, 77)]
 
-    # If one region contains 5 subregions, region size is 20,
-    # region length is 72 and region height is 36
-    # That's good but I'd like an even number (makes it easier when creating boundaries)
-    # If one region contains 6 subregions, region size is 24
-    # region length is 60 and region height is 30
-    # Let's try it
+    # Pixel size of region on world map
     REGION_SIZE: int = 24
+    # Amount of regions in grid
     REGION_LENGTH: int = 60
     REGION_HEIGHT: int = 30
-
-    X_START: tuple[int] = (None, 0, 1, 1, 1, 1, 0, 0, 0)
-    Y_START: tuple[int] = (None, 0, 0, 0, 1, 1, 1, 1, 0)
-    X_END: tuple[int] = (None, 1, 1, 1, 1, 0, 0, 0, 0)
-    Y_END: tuple[int] = (None, 0, 0, 1, 1, 1, 1, 0, 0)
+    # Top pixel offset in region map
+    SQUARE_KM_START_Y: int = 24
+    SQUARE_KM_END_Y: int = 696
 
     def __init__(self):
         super().__init__()
@@ -315,9 +309,11 @@ class Main(QtWidgets.QMainWindow):
         painter.setPen(pen)
 
         for x in range(0, 1440, Main.REGION_SIZE):
-            for y in range(0, 720, Main.REGION_SIZE):
-                painter.drawLine(x, 0, x, 720)
-                painter.drawLine(0, y, 1440, y)
+            painter.drawLine(x, 0, x, 720)
+
+        for y in range(0, 720, Main.REGION_SIZE):
+            painter.drawLine(0, y, 1440, y)
+
         painter.end()
 
     def paint_coastline(self, coastline: list[Region]):
@@ -338,11 +334,44 @@ class Main(QtWidgets.QMainWindow):
                              (region.metrics.y + 1) * Main.REGION_SIZE - 1)
         painter.end()
 
+    def paint_square_mile_lines(self, map: dict[list[str, int]]):
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setColor(constants.LINE_COLOR)
+        pen.setWidth(1)
+        painter.setPen(pen)
+
+        vertical = self.world.get_subregion(0, 0).metrics.vertical_stretch
+
+        for y in range(Main.SQUARE_KM_START_Y, 720, vertical):
+            painter.drawLine(0, y, 1440, y)
+
+        for i in range(len(map["x"])):
+            if map["subregion_border"][i]:
+                painter.drawPoint(720 + map["x"][i],
+                                  Main.SQUARE_KM_START_Y + map["y"][i])
+
+        painter.end()
+
+    def paint_square_mile_grid(self, map: dict[list[str, int]]):
+        painter = QtGui.QPainter(self.screen.pixmap())
+        pen = QtGui.QPen()
+        pen.setColor(constants.GRID_COLOR)
+        pen.setWidth(1)
+        painter.setPen(pen)
+
+        for x in range(0, 1440, 10):
+            painter.drawLine(x, 0, x, 720)
+
+        for y in range(Main.SQUARE_KM_START_Y, Main.SQUARE_KM_END_Y, 10):
+            painter.drawLine(0, y, 1440, y)
+
+        painter.end()
+
     def paint_region_map(self, map: dict[list]):
         """Paints all square kilometers of a region"""
         painter = QtGui.QPainter(self.screen.pixmap())
         painter.fillRect(0, 0, 1440, 720, QColor(0, 0, 0))
-
         unique = set(map["terrain"])
 
         for terrain in unique:
@@ -352,7 +381,8 @@ class Main(QtWidgets.QMainWindow):
             painter.setPen(pen)
 
             for i in range(len(map["x"])):
-                painter.drawPoint(720 + map["x"][i], 26 + map["y"][i])
+                painter.drawPoint(720 + map["x"][i],
+                                  Main.SQUARE_KM_START_Y + map["y"][i])
         painter.end()
 
     def expand_plates(self):
@@ -529,13 +559,28 @@ class Main(QtWidgets.QMainWindow):
             self.paint_plate_borders()
         self.update()
 
-    def view_square_kilometers(self, region: Region):
+    def view_square_kilometers(self):
+        """Paints the region"""
+        self.paint_region_map(self.world.km_squares_dicts)
+
+        if self.view_options.view_grid.isChecked():
+            self.paint_square_mile_grid(self.world.km_squares_dicts)
+        if self.view_options.view_lines.isChecked():
+            self.paint_square_mile_lines(self.world.km_squares_dicts)
+        self.update()
+
+    def refresh_map(self):
+        """Repaints the currently active map"""
+        if self.zoom_level == constants.SUBREGION:
+            self.view_continents(True)
+        elif self.zoom_level == constants.SQUARE_KILOMETER:
+            self.view_square_kilometers()
+
+    def open_region(self, region: Region):
         """Zooms the region"""
         self.zoom_level = constants.SQUARE_KILOMETER
         self.world.construct_region(region.x, region.metrics.y)
-        # Loops over a dict now. Don't try and loop over a dataframe, takes forever
-        self.paint_region_map(self.world.km_squares_dicts)
-        self.update()
+        self.view_square_kilometers()
 
     def view_world_info(self):
         """Shows world information"""
@@ -584,7 +629,7 @@ Sea percentage: {sea_area / self.world.area:.0%}
 
                 elif self.current_tool == self.tool_info:
                     if self.tool_info.get_current_tool() == "Open region":
-                        self.view_square_kilometers(self.selected_region)
+                        self.open_region(self.selected_region)
 
             elif self.zoom_level == constants.SQUARE_KILOMETER:
                 # More options to come

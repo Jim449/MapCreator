@@ -455,7 +455,9 @@ class World():
         # Only call this method if the region didn't exist
 
         vertical = self.subregions[0][0].metrics.vertical_stretch
-        data = {"x": [], "y": [], "terrain": []}
+        data = {"x": [], "y": [], "terrain": [],
+                "subregion_x": [], "subregion_y": [],
+                "subregion_border": []}
         line = []
 
         for sub_y in range(self.region_size):
@@ -471,13 +473,18 @@ class World():
             for kilometer_x in range(stretch * (-self.region_size // 2),
                                      stretch * (self.region_size // 2)):
 
-                # subregion_x = x // stretch
-                # subregion_y = kilometer_y // vertical
-
                 data["x"].append(kilometer_x)
                 data["y"].append(kilometer_y)
+                data["subregion_x"].append(kilometer_x // stretch)
+                data["subregion_y"].append(kilometer_y // vertical)
+
+                if kilometer_x % stretch == 0:
+                    data["subregion_border"].append(1)
+                else:
+                    data["subregion_border"].append(0)
                 # constants.WATER
                 data["terrain"].append(10)
+
                 # Grab terrain from mile later
         # TODO remove dicts if they don't lead to improved looping speed
         # Dicts did lead to improve speed. Scrap the dataframe!

@@ -15,18 +15,16 @@ class ViewOptions():
         # setting the details flag to false when checking off
         # A lambda should solve that so it's always True
         self.view_grid = QtWidgets.QCheckBox(text="View grid")
-        self.view_grid.stateChanged.connect(lambda: main.view_continents(True))
+        self.view_grid.stateChanged.connect(main.refresh_map)
         self.layout.addWidget(self.view_grid)
 
         self.view_lines = QtWidgets.QCheckBox(text="View key lines")
-        self.view_lines.stateChanged.connect(
-            lambda: main.view_continents(True))
+        self.view_lines.stateChanged.connect(main.refresh_map)
         self.layout.addWidget(self.view_lines)
 
         self.view_plate_borders = QtWidgets.QCheckBox(
             text="View plate borders")
-        self.view_plate_borders.stateChanged.connect(
-            lambda: main.view_continents(True))
+        self.view_plate_borders.stateChanged.connect(main.refresh_map)
         self.layout.addWidget(self.view_plate_borders)
 
         self.view_world = QtWidgets.QPushButton(text="View world")
