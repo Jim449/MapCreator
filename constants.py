@@ -103,6 +103,8 @@ def get_side(dir: int, width: int = 1, cell_size: int = 4) -> tuple[int]:
     """Returns coordinates, width and height (x1, y1, w, h) required to draw the edge of a square"""
     # I need to use cell_size - 1 not to draw on the next cell
     # I need to use width - 1 or it'll draw one pixel too thick
+    # Using (cell_size -1) and (width - 1) everywhere leads to shaky eastern edges
+    # but it's better than most of the alternatives
     if dir == NORTH:
         return (0, 0, cell_size - 1, width - 1)
     elif dir == EAST:
