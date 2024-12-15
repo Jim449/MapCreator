@@ -101,14 +101,16 @@ def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[
 
 def get_side(dir: int, width: int = 1, cell_size: int = 4) -> tuple[int]:
     """Returns coordinates, width and height (x1, y1, w, h) required to draw the edge of a square"""
+    # I need to use cell_size - 1 not to draw on the next cell
+    # I need to use width - 1 or it'll draw one pixel too thick
     if dir == NORTH:
-        return (0, 0, cell_size, width)
+        return (0, 0, cell_size - 1, width - 1)
     elif dir == EAST:
-        return (cell_size - width, 0, width, cell_size)
+        return (cell_size - 1 - (width - 1), 0, width - 1, cell_size - 1)
     elif dir == SOUTH:
-        return (0, cell_size - width, cell_size, cell_size)
+        return (0, cell_size - 1 - (width - 1), cell_size - 1, width - 1)
     elif dir == WEST:
-        return (0, 0, width, cell_size)
+        return (0, 0, width - 1, cell_size - 1)
 
 
 def get_corner(dir: int, cell_size: int = 4) -> tuple[int]:

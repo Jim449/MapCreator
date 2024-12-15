@@ -261,14 +261,20 @@ class Main(QtWidgets.QMainWindow):
                                      width=2)
                     self.paint_corners(painter, subregion.x, subregion.metrics.y,
                                        surroundings, constants.LAND,
-                                       constants.get_color(constants.SHORE),
-                                       2)
+                                       corner_color=constants.get_color(
+                                           constants.SHORE),
+                                       corner_width=2)
                 elif subregion.terrain == constants.MOUNTAIN:
                     self.paint_edges(painter, subregion.x, subregion.metrics.y,
                                      surroundings, constants.FLATLAND,
                                      edge_color=constants.get_color(
                                          constants.CLIFFS),
                                      width=1)
+                    self.paint_corners(painter, subregion.x, subregion.metrics.y,
+                                       surroundings, constants.FLATLAND,
+                                       corner_color=constants.get_color(
+                                           constants.LAND),
+                                       corner_width=2)
         painter.end()
 
     def paint_lines(self):
