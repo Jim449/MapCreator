@@ -46,7 +46,7 @@ def get_type(type: int) -> str:
 
 def get_type_value(type: str) -> int:
     """Translates a string type into an integer constant"""
-    type_values = {"center": 0, "north": 1, "northeast": 2, "wast": 3, "southeast": 4, "south": 5,
+    type_values = {"center": 0, "north": 1, "northeast": 2, "east": 3, "southeast": 4, "south": 5,
                    "southwest": 6, "west": 7, "northwest": 8, "land": 9, "water": 10, "mountain": 11}
     return type_values[type.lower()]
 

@@ -15,6 +15,8 @@ class Region():
         self.west = x * step - 180
         self.east = self.west + step
 
+        self.update_subdivision: bool = False
+
         # Plate belonging
         self.plate: int = -1
 
@@ -54,6 +56,14 @@ class Region():
         """Returns true if this region is at a plate boundary"""
         return (self.north_boundary or self.east_boundary
                 or self.south_boundary or self.west_boundary)
+
+    def set_terrain(self, terrain: int, set_update_flag: bool = True) -> None:
+        """Sets the regions terrain.
+        If set_update_flag is true, the same terrain should be applied
+        to smaller-sized areas belonging to this region.
+        This function will not set the terrain of those areas."""
+        self.terrain = terrain
+        self.update_subdivision = set_update_flag
 
     def get_info(self) -> str:
         text = f"""Latitude: {self.metrics.south} to {self.metrics.north}

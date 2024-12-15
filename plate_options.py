@@ -55,7 +55,7 @@ class PlateOptions():
 
         self.sea_plates = QtWidgets.QSpinBox()
         self.sea_plates.setMinimum(0)
-        self.sea_plates.setMaximum(11)
+        self.sea_plates.setMaximum(3)
         self.sea_plates.setValue(1)
         self.layout.addWidget(self.sea_plates)
 

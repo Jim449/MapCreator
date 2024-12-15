@@ -410,11 +410,11 @@ class Plate():
 
         if self.type == constants.LAND:
             for region in self.claimed_regions:
-                region.terrain = constants.LAND
+                region.set_terrain(constants.LAND)
                 self.land_area += region.metrics.area
         elif self.type == constants.WATER:
             for region in self.claimed_regions:
-                region.terrain = constants.WATER
+                region.set_terrain(constants.WATER)
                 self.sea_area += region.metrics.area
         else:
             if self.type in (
@@ -429,10 +429,10 @@ class Plate():
             for region in self.claimed_regions:
                 if (region.horizontal_land_check and region.vertical_land_check) \
                         or (region.ascending_land_check and region.descending_land_check):
-                    region.terrain = constants.LAND
+                    region.set_terrain(constants.LAND)
                     self.land_area += region.metrics.area
                 else:
-                    region.terrain = constants.WATER
+                    region.set_terrain(constants.WATER)
                     self.sea_area += region.metrics.area
 
     def sink(self) -> None:
@@ -441,7 +441,7 @@ class Plate():
         self.sea_area = 0
 
         for region in self.claimed_regions:
-            region.terrain = constants.WATER
+            region.set_terrain(constants.WATER)
             region.horizontal_land_check = False
             region.vertical_land_check = False
             region.ascending_land_check = False
@@ -466,15 +466,19 @@ class Plate():
         border = []
 
         for region in self.claimed_regions:
-            for dir in range(1, 8, 2):
-                if region.has_boundary_at(dir):
-                    x, y = constants.get_next_index(region.x, region.metrics.y,
-                                                    dir, self.max_x, self.max_y)
+            for dir in range(1, 9):
+                x, y = constants.get_next_index(region.x, region.metrics.y,
+                                                dir, self.max_x, self.max_y)
+                try:
                     neighbor: Region = self.world_map[y][x]
+                except IndexError:
+                    continue
 
-                    if constants.is_type(neighbor.terrain, external_terrain) and region not in border:
-                        region.border_distance = 1
-                        border.append(region)
+                if neighbor.plate != self.id \
+                    and constants.is_type(neighbor.terrain, external_terrain) \
+                        and neighbor not in border:
+                    region.border_distance = 1
+                    border.append(region)
         return border
 
     def find_border_distance(self, external_terrain: int, max_distance: int = 100) -> list[list[Region]]:
@@ -498,10 +502,13 @@ class Plate():
             current_circle = []
 
             for region in previous_circle:
-                for dir in range(1, 8, 2):
+                for dir in range(1, 9):
                     x, y = constants.get_next_index(region.x, region.metrics.y,
                                                     dir, self.max_x, self.max_y)
-                    neighbor: Region = self.world_map[y][x]
+                    try:
+                        neighbor: Region = self.world_map[y][x]
+                    except IndexError:
+                        continue
 
                     if neighbor.plate == self.id and neighbor.border_distance == -1:
                         neighbor.border_distance = distance

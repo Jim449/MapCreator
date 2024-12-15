@@ -3,6 +3,7 @@ from plate import Plate
 from region_metrics import RegionMetrics
 from boundary import Boundary
 from line_generator import LineGenerator
+from typing import Any
 import constants
 import math
 import random
@@ -180,39 +181,66 @@ class World():
 
         return finished
 
-    def build_plates(self):
+    def build_plates(self) -> None:
         """Expands all tectonic plates until the entire world is covered"""
         while True:
             finished = self.expand_plates()
             if finished:
                 break
 
-    def create_continents(self):
+    def create_continents(self) -> None:
         """Creates land and water on all plates"""
         for plate in self.plates:
             plate.create_land()
 
-    def update_regions_from_subregions(self):
+    def find_maximum_key(self, dictionary: dict[Any, int]) -> Any:
+        """Returns the key which holds the dictionarys max value"""
+        max_key = None
+        max_value = None
+
+        for key, value in dictionary.items():
+            if max_value is None or value > max_value:
+                max_key = key
+                max_value = value
+        return max_key
+
+    def find_region_main_terrain(self, region: Region) -> int:
+        """Returns the most common terrain within the subregions of a region"""
+        region_x = region.x
+        region_y = region.metrics.y
+        terrain_count = dict()
+
+        for sub_x in range(self.region_size):
+            for sub_y in range(self.region_size):
+                subregion = self.get_subregion_of_region(
+                    sub_x, sub_y, region_x, region_y)
+
+                if subregion.terrain in terrain_count:
+                    terrain_count[subregion.terrain] += 1
+                else:
+                    terrain_count[subregion.terrain] = 1
+
+        return self.find_maximum_key(terrain_count)
+
+    def update_regions_from_subregions(self) -> None:
         """Sets region variables based on subregion variables"""
         for y in range(self.height):
             for x in range(self.length):
                 region = self.get_region(x, y)
-                # Takes the middle subregion
-                # You could calculate plate and terrain percentages of all subregions within region
-                # and grab the highest percentages but the the simpler approach should be good enough
-                subregion = self.get_subregion_of_region(2, 2, x, y)
-                region.plate = subregion.plate
-                region.terrain = subregion.terrain
+                region.set_terrain(self.find_region_main_terrain(
+                    region), set_update_flag=False)
 
-    def update_subregions_from_regions(self):
+    def update_subregions_from_regions(self) -> None:
         """Sets subregion variables based on region variables"""
         for y in range(self.sub_height):
             for x in range(self.sub_length):
                 ry = y // self.region_size
                 region = self.get_region(x // self.region_size, ry)
                 subregion = self.get_subregion(x, y)
-                subregion.plate = region.plate
-                subregion.terrain = region.terrain
+                subregion.set_terrain(region.terrain)
+
+                if subregion.plate == -1:
+                    subregion.plate = region.plate
 
     def find_plate_boundaries(self):
         """Finds plate boundaries on a subregion level"""
@@ -232,21 +260,16 @@ class World():
                     region.south_boundary = True
                     south.north_boundary = True
 
-    def get_plate(self, x: int, y: int, precision: str = "Region") -> Plate:
-        """Returns the plate occupying the region at (x,y)
+    def get_plate(self, plate_id: int) -> Plate:
+        """Returns the plate with the given id
 
         Raises:
             IndexError"""
-        if precision == "Subregion":
-            id = self.get_subregion(x, y).plate
-        else:
-            id = self.get_region(x, y).plate
-
         try:
-            return self.plates[id]
+            return self.plates[plate_id]
         except IndexError:
             raise IndexError(
-                f"Attempt to access nonexistant tectonic plate in region ({x}, {y})")
+                f"Attempt to access nonexistant tectonic plate {plate_id}")
 
     def get_land_area(self) -> int:
         """Calculates total land area"""
@@ -436,7 +459,7 @@ class World():
                 terrain = line.get_terrain(x, y)
 
                 if not constants.is_type(subregion.terrain, terrain):
-                    subregion.terrain = terrain
+                    subregion.set_terrain(terrain)
 
     def generate_region_coastline(self):
         """Generates terrain using the saved boundary"""

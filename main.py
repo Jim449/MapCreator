@@ -38,6 +38,8 @@ class Main(QtWidgets.QMainWindow):
     # Amount of regions in grid
     REGION_LENGTH: int = 60
     REGION_HEIGHT: int = 30
+    # Pixel size of subregion on world map
+    SUBREGION_SIZE: int = 4
     # Top pixel offset in region map
     SQUARE_KM_START_Y: int = 24
     SQUARE_KM_END_Y: int = 696
@@ -52,6 +54,7 @@ class Main(QtWidgets.QMainWindow):
 
         self.selected_plate: Plate = None
         self.selected_region: Region = None
+        self.selected_subregion: Region = None
         # Zoom level named from smallest visible area type
         self.zoom_level: str = constants.SUBREGION
 
@@ -188,23 +191,6 @@ class Main(QtWidgets.QMainWindow):
                 coordinates = constants.get_corner(dir + 1)
                 painter.drawPoint(x*size + coordinates[0],
                                   y*size + coordinates[1])
-
-    def paint_diagonals(self, painter: QtGui.QPainter, x: int, y: int,
-                        regions: list[Region], surrounding_terrain: int,
-                        diagonal_color: QColor, diagonal_width: int = 1):
-        diagonal_pen = QtGui.QPen()
-        diagonal_pen.setWidth(diagonal_width)
-        diagonal_pen.setColor(diagonal_color)
-        center_terrain = regions[0].terrain
-        painter.setPen(diagonal_pen)
-
-        # TODO so I want to connect two diagonal tiles
-        # I could draw a number of lines between them
-        # If I could draw a tilted rectangle, that's even better
-        # I may want to draw an outline in a different color
-        # The results of paint_corners should be painted over
-        # This method will paint on surrounding regions
-        # It's important to call paint_diagonals last
 
     def paint_plate_borders(self) -> None:
         """Paints plate borders"""
@@ -477,7 +463,7 @@ class Main(QtWidgets.QMainWindow):
         regions = self.selected_plate.find_border_offset(constants.LAND, constants.LAND,
                                                          1, 1)
         for region in regions:
-            region.terrain = constants.MOUNTAIN
+            region.set_terrain(constants.MOUNTAIN)
         self.view_continents(detailed=False)
 
     def create_mountains_by_sea(self):
@@ -488,7 +474,7 @@ class Main(QtWidgets.QMainWindow):
                                                          min_offset, max_offset)
 
         for region in regions:
-            region.terrain = constants.MOUNTAIN
+            region.set_terrain(constants.MOUNTAIN)
 
         self.view_continents(detailed=False)
 
@@ -496,7 +482,7 @@ class Main(QtWidgets.QMainWindow):
         """Removes all mountains from the selected plate"""
         for region in self.selected_plate.claimed_regions:
             if region.terrain == constants.MOUNTAIN:
-                region.terrain = constants.LAND
+                region.set_terrain(constants.LAND)
         self.view_continents(detailed=False)
 
     def open_plate_options(self):
@@ -605,24 +591,28 @@ Sea percentage: {sea_area / self.world.area:.0%}
                 header = "Region"
                 column = x // Main.REGION_SIZE
                 row = y // Main.REGION_SIZE
+                sub_column = x // Main.SUBREGION_SIZE
+                sub_row = y // Main.SUBREGION_SIZE
 
                 self.selected_region = self.world.get_region(column, row)
+                self.selected_subregion = self.world.get_subregion(
+                    sub_column, sub_row)
                 self.info_label.setText(
                     f"{header}\n{self.selected_region.get_info()}")
 
                 try:
                     self.selected_plate = self.world.get_plate(
-                        column, row, constants.REGION)
-                except IndexError:
-                    pass
+                        self.selected_subregion.plate)
+                    self.info_label.setText(
+                        self.info_label.text() + f"\n\n{self.selected_plate.get_info()}")
+                except IndexError as e:
+                    print(e)
 
                 if self.current_tool == self.continent_options:
                     self.continent_options.type.setCurrentIndex(
                         self.selected_plate.type)
                     self.continent_options.plate_margin.setValue(
                         self.selected_plate.margin)
-                    self.info_label.setText(
-                        f"{header}\n{self.selected_region.get_info()}\n\n{self.selected_plate.get_info()}")
 
                 elif self.current_tool == self.boundary_options:
                     self.select_coastline(self.selected_region)
