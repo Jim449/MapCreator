@@ -7,7 +7,6 @@ from typing import Any
 import constants
 import math
 import random
-from pandas import DataFrame
 
 
 class World():
@@ -36,10 +35,7 @@ class World():
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
 
-        # TODO Test if I can save time by using dicts
-        # It did save time. Consider scrapping the DataFrame
-        self.km_squares_dicts: dict[list[str, int]] = None
-        # self.km_squares: DataFrame = None
+        self.km_squares_dicts: dict[str, list[int]] = None
 
         self.fixed_growth = True
 
@@ -242,6 +238,25 @@ class World():
                 if subregion.plate == -1:
                     subregion.plate = region.plate
 
+    def update_kilometers_from_subregion(self, subregion: Region, km_map: dict[str, list[int]]) -> None:
+        """Updates the terrain of all square kilometers in a subregion"""
+        for index in range(len(km_map["x"])):
+            if km_map["subregion_x"][index] == subregion.x \
+                    and km_map["subregion_y"][index] == subregion.metrics.y:
+                km_map["terrain"][index] = subregion.terrain
+
+    def update_kilometers_from_region(self, active_region: Region,
+                                      km_map: dict[str, list[int]]) -> None:
+        """Updates the terrain of all square kilometers in a region"""
+        for y in range(self.region_size):
+            for x in range(self.region_size):
+                subregion = self.get_subregion_of_region(
+                    x, y, active_region.x, active_region.metrics.y)
+
+                if subregion.update_subdivision:
+                    self.update_kilometers_from_subregion(subregion, km_map)
+                    subregion.update_subdivision = False
+
     def find_plate_boundaries(self):
         """Finds plate boundaries on a subregion level"""
         for y in range(self.sub_height - 1):
@@ -289,26 +304,71 @@ class World():
                     area += region.metrics.area
         return area
 
-    def _find_coastline_exit(self, entrance: int, northeast: Region, southeast: Region,
-                             southwest: Region, northwest: Region) -> int:
+    def _find_coastline_exit(self, entrance: int, northeast: int, southeast: int,
+                             southwest: int, northwest: int,
+                             enclosed_terrain: int = constants.LAND) -> int:
         """Finds the direction of the coastline exit,
-        given that land is counter-clockwise to the coastline entrance"""
+        given the terrain of four cells in a square.
+        Assumes clockwise travel around a land mass.
+        In the case that two land masses meet on a diagonal,
+        the coastline exit of the current landmass is returned."""
 
-        if northwest.terrain == constants.WATER and northeast.terrain == constants.LAND:
-            if southwest.terrain == constants.LAND and southeast.terrain == constants.WATER:
-                # Handling a rare case where there are two possible exit directions
-                return constants.turn_direction(entrance)
+        # I used to do something like northeast == LAND and northwest == WATER
+        # which was easier to read. But it wouldn't let me find something like
+        # lake shores, forest edges or coastline edges
+        # where there are some mountains by the shore
+        if constants.is_type(northeast, enclosed_terrain) and \
+                constants.is_type(northwest, enclosed_terrain) == False:
+            if constants.is_type(southwest, enclosed_terrain) \
+                    and constants.is_type(southeast, enclosed_terrain) == False:
+                # Rare case of diagonal land masses. Either go EAST to NORTH or WEST to SOUTH
+                return constants.angle_direction(entrance, 6)
             else:
                 return constants.NORTH
-        elif northeast.terrain == constants.WATER and southeast.terrain == constants.LAND:
-            if northwest.terrain == constants.LAND and southwest.terrain == constants.WATER:
-                return constants.turn_direction(entrance)
+        elif constants.is_type(southeast, enclosed_terrain) and \
+                constants.is_type(northeast, enclosed_terrain) == False:
+            if constants.is_type(northwest, enclosed_terrain) and \
+                    constants.is_type(southwest, enclosed_terrain) == False:
+                return constants.turn_direction(entrance, 6)
             else:
                 return constants.EAST
-        elif southeast.terrain == constants.WATER and southwest.terrain == constants.LAND:
+        elif constants.is_type(southwest, enclosed_terrain) and \
+                constants.is_type(southeast, enclosed_terrain) == False:
             return constants.SOUTH
-        elif southwest.terrain == constants.WATER and northwest.terrain == constants.LAND:
+        elif constants.is_type(northwest, enclosed_terrain) and \
+                constants.is_type(southwest, enclosed_terrain) == False:
             return constants.WEST
+
+    def _find_coastline_entrance(self, exit: int, northeast: int, southeast: int,
+                                 southwest: int, northwest: int,
+                                 enclosed_terrain: int = constants.LAND) -> int:
+        """Finds the direction of the coastline entrance,
+        given the terrain of four cells in a square.
+        Assumes clockwise travel around a land mass.
+        In the case that two land masses meet on a diagonal,
+        the coastline entrance of the current landmass is returned."""
+
+        if constants.is_type(northeast, enclosed_terrain) and \
+                constants.is_type(southeast, enclosed_terrain) == False:
+            if constants.is_type(southwest, enclosed_terrain) and \
+                    constants.is_type(northwest, enclosed_terrain) == False:
+                # Rare case of diagonal land masses. Either go EAST to NORTH or WEST to SOUTH
+                return constants.angle_direction(exit, 2)
+            else:
+                return constants.EAST
+        elif constants.is_type(southeast, enclosed_terrain) and \
+                constants.is_type(southwest, enclosed_terrain) == False:
+            if constants.is_type(northwest, enclosed_terrain) and \
+                    constants.is_type(northeast, enclosed_terrain) == False:
+                return constants.angle_direction(exit, 2)
+            else:
+                return constants.SOUTH
+        elif constants.is_type(southwest, enclosed_terrain) and \
+                constants.is_type(northwest, enclosed_terrain) == False:
+            return constants.WEST
+        elif constants.is_type(northwest, enclosed_terrain) and \
+                constants.is_type(northeast, enclosed_terrain) == False:
+            return constants.NORTH
 
     def _find_square_regions(self, x: int, y: int, dir: int) -> tuple[Region]:
         """Returns a tuple of regions in order (NORTHEAST, SOUTHEAST, SOUTHWEST, NORTHWEST)
@@ -368,16 +428,17 @@ class World():
         Returns a list of coastline regions.
         If the coordinates points to an ocean region, returns None"""
 
-        # Works much better now, but I did get a None in coastline there...
-        # I wonder why
-        # Got an infinite loop there. Something broke after changing region size to 6?
-        # No, I have other errors
+        # TODO fix errors at the poles. Try ending the coastline
+        # Then, go back to the starting point, change to counter-clockwise and generate
+        # Some functions assume clockwise direction
 
         coastline = []
 
         # If the user selected a landmass in the middle of a continent, I search outwards
         # Search north first. Algorithm will be less than efficient if coastline
-        # is nearby but not to the north, but it's not a big deal
+        # is nearby but not to the north
+        # TODO but that's no good. The user should click on the actual coastline
+        # or on a region one cell away from it
         for dir in range(1, 8, 2):
             region = self._find_region_in_direction(
                 x, y, dir, constants.WATER)
@@ -454,8 +515,8 @@ class World():
 
         for x in range(line.length):
             for y in range(line.height):
-                # TODO I get an index error when land crosses east-west-barrier. Fix it!
-                subregion = self.get_subregion(start_x + x, start_y + y)
+                subregion = self.get_subregion(
+                    (start_x + x) % self.length, start_y + y)
                 terrain = line.get_terrain(x, y)
 
                 if not constants.is_type(subregion.terrain, terrain):
@@ -469,22 +530,23 @@ class World():
         for line in self.boundary.get_path():
             self.apply_line_on_region(line)
 
-    def construct_region(self, x: int, y: int) -> dict[list[str, int]]:
+    def construct_region(self, region_x: int, region_y: int) -> dict[str, list[int]]:
         """Constructs the region at (x, y) down to kilometer-level precision"""
-        # TODO At the moment, this just creates water
-        # I need to grab the right terrain
-        # Then, I want to store this region in the database so that changes are saved
-        # Then, I need a function to load a saved region
-        # Only call this method if the region didn't exist
 
         vertical = self.subregions[0][0].metrics.vertical_stretch
+        # If I have regions in this format, it'll be hard to navigate in compass directions
+        # I could try something like
+        # data = {(x, y): {terrain: int, subregion_x: int, subregion_y: int, subregion_border: int}}
+        # I don't need to use a two-dimensional list, this should be faster
+        # More importantly, it allows for negative indexes
         data = {"x": [], "y": [], "terrain": [],
                 "subregion_x": [], "subregion_y": [],
                 "subregion_border": []}
         line = []
 
         for sub_y in range(self.region_size):
-            subregion = self.get_subregion_of_region(0, sub_y, x, y)
+            subregion = self.get_subregion_of_region(
+                0, sub_y, region_x, region_y)
             top = subregion.metrics.top_stretch
             bottom = subregion.metrics.bottom_stretch
 
@@ -493,24 +555,29 @@ class World():
                 line.append(horizontal)
 
         for kilometer_y, stretch in enumerate(line):
-            for kilometer_x in range(stretch * (-self.region_size // 2),
-                                     stretch * (self.region_size // 2)):
+            for x in range(stretch * self.region_size):
+                subregion_x = x // stretch
+                subregion_y = kilometer_y // vertical
+                subregion = self.get_subregion_of_region(
+                    subregion_x, subregion_y, region_x, region_y)
 
-                data["x"].append(kilometer_x)
+                kilometer_x = x - stretch * self.region_size // 2
+
+                # entry = dict()
+                # Add some stuff...
+                # data[(kilometer_x, kilometer_y)] = entry
+
+                data["x"].append(kilometer_x - stretch *
+                                 (self.region_size // 2))
                 data["y"].append(kilometer_y)
-                data["subregion_x"].append(kilometer_x // stretch)
-                data["subregion_y"].append(kilometer_y // vertical)
+                data["subregion_x"].append(subregion_x)
+                data["subregion_y"].append(subregion_y)
+                data["terrain"].append(subregion.terrain)
 
-                if kilometer_x % stretch == 0:
+                if kilometer_x % stretch == 0 or kilometer_y % vertical == 0:
                     data["subregion_border"].append(1)
                 else:
                     data["subregion_border"].append(0)
-                # constants.WATER
-                data["terrain"].append(10)
 
-                # Grab terrain from mile later
-        # TODO remove dicts if they don't lead to improved looping speed
-        # Dicts did lead to improve speed. Scrap the dataframe!
         self.km_squares_dicts = data
-        # self.km_squares = DataFrame(data)
         return self.km_squares_dicts

@@ -333,10 +333,12 @@ class Main(QtWidgets.QMainWindow):
         pen.setWidth(1)
         painter.setPen(pen)
 
-        vertical = self.world.get_subregion(0, 0).metrics.vertical_stretch
+        # Try only using the drawPoint to check if my map is correct
+        # Of course it's correct
+        # vertical = self.world.get_subregion(0, 0).metrics.vertical_stretch
 
-        for y in range(Main.SQUARE_KM_START_Y, 720, vertical):
-            painter.drawLine(0, y, 1440, y)
+        # for y in range(Main.SQUARE_KM_START_Y, 720, vertical):
+        #     painter.drawLine(0, y, 1440, y)
 
         for i in range(len(map["x"])):
             if map["subregion_border"][i]:
@@ -373,8 +375,9 @@ class Main(QtWidgets.QMainWindow):
             painter.setPen(pen)
 
             for i in range(len(map["x"])):
-                painter.drawPoint(720 + map["x"][i],
-                                  Main.SQUARE_KM_START_Y + map["y"][i])
+                if map["terrain"][i] == terrain:
+                    painter.drawPoint(720 + map["x"][i],
+                                      Main.SQUARE_KM_START_Y + map["y"][i])
         painter.end()
 
     def expand_plates(self):

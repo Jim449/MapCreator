@@ -61,20 +61,26 @@ def is_type(type: int, cathegory: int):
         return type in (SHALLOWS, DEPTHS)
     elif cathegory == FLATLAND:
         return type in (LAND, SHORE)
+    else:
+        return False
 
 
 def get_next_coordinates(x: int, y: int, dir: int) -> tuple[int]:
     """Returns new coordinates (x,y) after travelling once in a direction."""
-    if dir == NORTH:
-        return (x, y-1)
-    elif dir == EAST:
-        return (x+1, y)
-    elif dir == SOUTH:
-        return (x, y+1)
-    elif dir == WEST:
-        return (x-1, y)
-    else:
-        return (x, y)
+    nx = x
+    ny = y
+
+    if dir in (NORTH, NORTHEAST, NORTHWEST):
+        ny -= 1
+    elif dir in (SOUTH, SOUTHEAST, SOUTHWEST):
+        ny += 1
+
+    if dir in (EAST, NORTHEAST, SOUTHEAST):
+        nx += 1
+    elif dir in (WEST, NORTHWEST, SOUTHWEST):
+        nx -= 1
+
+    return (nx, ny)
 
 
 def get_next_index(x: int, y: int, dir: int, length: int, height: int) -> tuple[int]:
@@ -191,4 +197,32 @@ def get_close_surrondings(x: int, y: int, length: int, height: int) -> list[tupl
     for dir in range(1, 8, 2):
         result.append(get_next_index(x, y, dir, length, height))
 
+    return result
+
+
+def get_square(self, x: int, y: int, dir: int) -> list[tuple[int]]:
+    """Returns a list of coordinates in order NORTHEAST, SOUTHEAST, SOUTHWEST, NORTHWEST.
+    Provide one of these coordinates and the relative position of those coordinates."""
+    result = [None, None, None, None]
+
+    if dir == NORTHEAST:
+        result[0] = (x, y)
+        result[1] = get_next_coordinates(x, y, SOUTH)
+        result[2] = get_next_coordinates(x, y, SOUTHWEST)
+        result[3] = get_next_coordinates(x, y, WEST)
+    elif dir == SOUTHEAST:
+        result[0] = get_next_coordinates(x, y, NORTH)
+        result[1] = (x, y)
+        result[2] = get_next_coordinates(x, y, WEST)
+        result[3] = get_next_coordinates(x, y, NORTHWEST)
+    elif dir == SOUTHWEST:
+        result[0] = get_next_coordinates(x, y, NORTHEAST)
+        result[1] = get_next_coordinates(x, y, EAST)
+        result[2] = (x, y)
+        result[3] = get_next_coordinates(x, y, NORTH)
+    elif dir == NORTHWEST:
+        result[0] = get_next_coordinates(x, y, EAST)
+        result[1] = get_next_coordinates(x, y, SOUTHEAST)
+        result[2] = get_next_coordinates(x, y, SOUTH)
+        result[3] = (x, y)
     return result
