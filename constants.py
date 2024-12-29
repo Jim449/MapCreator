@@ -188,7 +188,7 @@ def get_surroundings(x: int, y: int, length: int, height: int) -> list[tuple[int
     return result
 
 
-def get_close_surrondings(x: int, y: int, length: int, height: int) -> list[tuple[int]]:
+def get_close_surroundings(x: int, y: int, length: int, height: int) -> list[tuple[int]]:
     """Returns coordinates representing the surroundings of point (x,y) in four directions.
     Returns a list of coordinates, corresponding to directions north, east, south, west,
     in that order"""
@@ -200,7 +200,7 @@ def get_close_surrondings(x: int, y: int, length: int, height: int) -> list[tupl
     return result
 
 
-def get_square(self, x: int, y: int, dir: int) -> list[tuple[int]]:
+def get_square(x: int, y: int, dir: int) -> list[tuple[int]]:
     """Returns a list of coordinates in order NORTHEAST, SOUTHEAST, SOUTHWEST, NORTHWEST.
     Provide one of these coordinates and the relative position of those coordinates."""
     result = [None, None, None, None]

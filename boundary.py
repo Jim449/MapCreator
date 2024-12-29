@@ -2,6 +2,10 @@ from line_generator import LineGenerator
 import constants
 
 
+class BoundaryEndException(Exception):
+    pass
+
+
 class Boundary():
     """Used to create a random line. It could be a boundary, circling around
      to its starting point or a path from one point to another"""

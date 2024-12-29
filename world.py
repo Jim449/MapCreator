@@ -1,9 +1,11 @@
 from region import Region
 from plate import Plate
 from region_metrics import RegionMetrics
-from boundary import Boundary
+from boundary import Boundary, BoundaryEndException
 from line_generator import LineGenerator
 from typing import Any
+from flat_grid import FlatGrid
+from sphere_grid import SphereGrid
 import constants
 import math
 import random
@@ -34,8 +36,13 @@ class World():
         self.regions: list[list[Region]] = []
         self.subregions: list[list[Region]] = []
         self.plates: list[Plate] = []
+        # self.regions: SphereGrid = None
+        # self.subregions: SphereGrid = None
 
         self.km_squares_dicts: dict[str, list[int]] = None
+
+        self.square_miles: FlatGrid = None
+        self.square_kilometers: FlatGrid = None
 
         self.fixed_growth = True
 
@@ -304,9 +311,10 @@ class World():
                     area += region.metrics.area
         return area
 
-    def _find_coastline_exit(self, entrance: int, northeast: int, southeast: int,
+    def _find_coastline_exit(self, northeast: int, southeast: int,
                              southwest: int, northwest: int,
-                             enclosed_terrain: int = constants.LAND) -> int:
+                             enclosed_terrain: int = constants.LAND,
+                             entrance: int = None) -> int:
         """Finds the direction of the coastline exit,
         given the terrain of four cells in a square.
         Assumes clockwise travel around a land mass.
@@ -322,14 +330,21 @@ class World():
             if constants.is_type(southwest, enclosed_terrain) \
                     and constants.is_type(southeast, enclosed_terrain) == False:
                 # Rare case of diagonal land masses. Either go EAST to NORTH or WEST to SOUTH
-                return constants.angle_direction(entrance, 6)
+                # Entrance is optional but required in this special case
+                if entrance is None:
+                    return None
+                else:
+                    return constants.angle_direction(entrance, 6)
             else:
                 return constants.NORTH
         elif constants.is_type(southeast, enclosed_terrain) and \
                 constants.is_type(northeast, enclosed_terrain) == False:
             if constants.is_type(northwest, enclosed_terrain) and \
                     constants.is_type(southwest, enclosed_terrain) == False:
-                return constants.turn_direction(entrance, 6)
+                if entrance is None:
+                    return None
+                else:
+                    return constants.turn_direction(entrance, 6)
             else:
                 return constants.EAST
         elif constants.is_type(southwest, enclosed_terrain) and \
@@ -339,9 +354,10 @@ class World():
                 constants.is_type(southwest, enclosed_terrain) == False:
             return constants.WEST
 
-    def _find_coastline_entrance(self, exit: int, northeast: int, southeast: int,
+    def _find_coastline_entrance(self, northeast: int, southeast: int,
                                  southwest: int, northwest: int,
-                                 enclosed_terrain: int = constants.LAND) -> int:
+                                 enclosed_terrain: int = constants.LAND,
+                                 exit: int = None) -> int:
         """Finds the direction of the coastline entrance,
         given the terrain of four cells in a square.
         Assumes clockwise travel around a land mass.
@@ -353,14 +369,20 @@ class World():
             if constants.is_type(southwest, enclosed_terrain) and \
                     constants.is_type(northwest, enclosed_terrain) == False:
                 # Rare case of diagonal land masses. Either go EAST to NORTH or WEST to SOUTH
-                return constants.angle_direction(exit, 2)
+                if exit is None:
+                    return None
+                else:
+                    return constants.angle_direction(exit, 2)
             else:
                 return constants.EAST
         elif constants.is_type(southeast, enclosed_terrain) and \
                 constants.is_type(southwest, enclosed_terrain) == False:
             if constants.is_type(northwest, enclosed_terrain) and \
                     constants.is_type(northeast, enclosed_terrain) == False:
-                return constants.angle_direction(exit, 2)
+                if exit is None:
+                    return None
+                else:
+                    return constants.angle_direction(exit, 2)
             else:
                 return constants.SOUTH
         elif constants.is_type(southwest, enclosed_terrain) and \
@@ -508,6 +530,111 @@ class World():
 
                 coastline.append(region)
                 self.boundary.add_segment(exit)
+
+    def _get_index_from_entrance_dir(self, entrance: int) -> int:
+        """Used by coastline-finding methods to get the correct cell
+        from constants.get_square(), given an entrance or exit direction"""
+        # if entrance is north (1), return northwest (3)
+        # if entrance is east (3), return northeast (0)
+        # if entrance is south (5), return southeast (1)
+        # if entrance is west (7), return southwest (2)
+
+        return (entrance // 2 + 3) % 4
+
+    def _get_corner_from_entrance_dir(self, entrance: int) -> int:
+        """Used by coastline-finding methods to get placement in square from entrance dir.
+        Use the placement to call constants.get_square()"""
+        # if entrance is north (1), return northwest (8)
+        # if entrance is east (3), return northeast (2)
+        # if entrance is south (5), return southeast (4)
+        # if entrance is west (7), return southwest (6)
+        # This should work. I can't add 7 since the cycle is from 1 to 8 rather than 0 to 7
+
+        return (entrance + 6) % 8 + 1
+
+    def find_mile_coastline(self, x: int, y: int,
+                            inner_terrain: int, outer_terrain: int) -> list[dict]:
+        # The find coastline method for square miles
+        # A method straight out of hell. It's so long!
+        # What to do?
+        coastline: list = []
+        boundary: Boundary = None
+        success = False
+        clockwise = True
+
+        for dir in range(2, 9, 2):
+            square = constants.get_square(x, y, dir)
+            miles = self.square_miles.get_all(square)
+
+            try:
+                ne_terrain = miles[0]["terrain"]
+                se_terrain = miles[1]["terrain"]
+                sw_terrain = miles[2]["terrain"]
+                nw_terrain = miles[3]["terrain"]
+            except TypeError:
+                continue
+
+            entrance = self._find_coastline_entrance(
+                ne_terrain, se_terrain, sw_terrain, nw_terrain, enclosed_terrain=inner_terrain)
+
+            if entrance is None:
+                continue
+
+            exit = self._find_coastline_exit(
+                ne_terrain, se_terrain, sw_terrain, nw_terrain, enclosed_terrain=inner_terrain)
+
+            success = True
+            break
+
+        if not success:
+            return
+
+        start_cell = miles[self._get_index_from_entrance_dir(entrance)]
+        start_entrance = entrance
+        start_miles = miles
+        coastline.append(start_cell)
+
+        self.boundary = Boundary(entrance=entrance, exit=exit, length=10, height=10,
+                                 start_x=miles[3]["x"] * 10 + 5, start_y=miles[3]["y"] * 10 + 5,
+                                 primary_terrain=inner_terrain,
+                                 secondary_terrain=outer_terrain)
+
+        while True:
+            cell = miles[self._get_index_from_entrance_dir(exit)]
+            entrance = constants.flip_direction(exit)
+            coastline.append(cell)
+            square = constants.get_square(cell["x"], cell["y"],
+                                          self._get_corner_from_entrance_dir(entrance))
+            miles = self.square_miles.get_all(square)
+
+            try:
+                ne_terrain = miles[0]["terrain"]
+                se_terrain = miles[1]["terrain"]
+                sw_terrain = miles[2]["terrain"]
+                nw_terrain = miles[3]["terrain"]
+
+                if clockwise:
+                    exit = self._find_coastline_exit(
+                        ne_terrain, se_terrain, sw_terrain, nw_terrain,
+                        enclosed_terrain=inner_terrain, entrance=entrance)
+                    boundary.add_segment(exit)
+                else:
+                    exit = self._find_coastline_entrance(
+                        ne_terrain, se_terrain, sw_terrain, nw_terrain,
+                        enclosed_terrain=inner_terrain, exit=entrance)
+                    # boundary.insert_segment(exit)
+
+            except TypeError:
+                if clockwise:
+                    cell = start_cell
+                    entrance = start_entrance
+                    miles = start_miles
+                    clockwise = False
+                else:
+                    return coastline
+
+            if clockwise and cell == start_cell and entrance == start_entrance:
+                return coastline
 
     def apply_line_on_region(self, line: LineGenerator):
         """Generates terrain using a line generator"""

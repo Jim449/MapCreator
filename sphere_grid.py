@@ -3,12 +3,14 @@ from region import Region
 
 class SphereGrid():
     def __init__(self):
-        self.content: dict[str, Region] = {}
+        self.content: dict[tuple, Region] = {}
+        self.values = None
+        self.index: int = 0
 
-    def add_cell(self, x: int, y: int, region: Region) -> None:
+    def add(self, x: int, y: int, region: Region) -> None:
         self.content[(x, y)] = region
 
-    def get_cell(self, x: int, y: int) -> Region:
+    def get(self, x: int, y: int) -> Region:
         return self.content[(x, y)]
 
     def get_all(self, positions: list[tuple[int]]) -> Region:
@@ -34,3 +36,16 @@ class SphereGrid():
         for cell in self.content.values():
             if cell.terrain == terrain:
                 result.append(cell)
+
+    def __iter__(self):
+        self.values = self.content.values()
+        self.index = 0
+        return self
+
+    def __next__(self):
+        try:
+            item = self.values[self.index]
+            self.index += 1
+            return item
+        except IndexError:
+            raise StopIteration
